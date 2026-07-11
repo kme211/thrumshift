@@ -4,7 +4,7 @@ import type { HeartRateTelemetrySource } from '../telemetry/HeartRateTelemetrySo
 
 interface HeartRateTelemetrySourceHarness {
   readonly source: HeartRateTelemetrySource
-  emitSample(): void
+  emitSample(): void | Promise<void>
 }
 
 export function runHeartRateTelemetrySourceContract(
@@ -35,11 +35,11 @@ export function runHeartRateTelemetrySourceContract(
       const listener = vi.fn()
       source.subscribeSamples(listener)
 
-      emitSample()
+      await emitSample()
       await source.connect()
-      emitSample()
+      await emitSample()
       await source.disconnect()
-      emitSample()
+      await emitSample()
 
       expect(listener).toHaveBeenCalledTimes(1)
     })
@@ -54,7 +54,7 @@ export function runHeartRateTelemetrySourceContract(
       unsubscribeStatus()
       unsubscribeSamples()
       await source.connect()
-      emitSample()
+      await emitSample()
 
       expect(statusListener).toHaveBeenCalledTimes(1)
       expect(sampleListener).not.toHaveBeenCalled()
@@ -71,7 +71,7 @@ export function runHeartRateTelemetrySourceContract(
       source.dispose()
       await source.connect()
       await source.disconnect()
-      emitSample()
+      await emitSample()
 
       expect(statusListener).toHaveBeenCalledTimes(1)
       expect(sampleListener).not.toHaveBeenCalled()

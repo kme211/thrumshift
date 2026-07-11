@@ -1,8 +1,18 @@
+import { WebBluetoothHeartRateSource } from '../telemetry/bluetooth/WebBluetoothHeartRateSource'
+import { getBrowserBluetoothEnvironment } from '../telemetry/bluetooth/bluetoothPorts'
 import { SimulatedHeartRateSource } from '../telemetry/simulated/SimulatedHeartRateSource'
 import { TelemetryDiagnostics } from './TelemetryDiagnostics'
 
-const developmentTelemetrySource = import.meta.env.DEV
-  ? new SimulatedHeartRateSource({ now: () => performance.now() })
+const developmentTelemetrySources = import.meta.env.DEV
+  ? {
+      simulated: new SimulatedHeartRateSource({ now: () => performance.now() }),
+      bluetooth: new WebBluetoothHeartRateSource(
+        getBrowserBluetoothEnvironment(),
+        {
+          now: () => performance.now(),
+        },
+      ),
+    }
   : null
 
 export function App() {
@@ -37,8 +47,11 @@ export function App() {
           </div>
         </div>
       </section>
-      {developmentTelemetrySource === null ? null : (
-        <TelemetryDiagnostics source={developmentTelemetrySource} />
+      {developmentTelemetrySources === null ? null : (
+        <TelemetryDiagnostics
+          simulatedSource={developmentTelemetrySources.simulated}
+          bluetoothSource={developmentTelemetrySources.bluetooth}
+        />
       )}
     </main>
   )

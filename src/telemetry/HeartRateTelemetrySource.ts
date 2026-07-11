@@ -11,7 +11,19 @@ export type TelemetryCapability =
     }
 
 export interface TelemetrySourceError {
-  readonly code: 'source-error'
+  readonly code:
+    | 'source-error'
+    | 'unsupported'
+    | 'insecure-context'
+    | 'chooser-cancelled'
+    | 'permission-denied'
+    | 'gatt-unavailable'
+    | 'connection-failed'
+    | 'service-unavailable'
+    | 'characteristic-unavailable'
+    | 'notifications-failed'
+    | 'malformed-measurement'
+    | 'device-disconnected'
   readonly message: string
 }
 

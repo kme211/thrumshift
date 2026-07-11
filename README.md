@@ -2,7 +2,7 @@
 
 Stay in range. Keep the station alive.
 
-This repository currently contains the Phase 2 executable gray box for Thrumshift. It includes a browser-independent heart-rate packet parser and deterministic simulated telemetry, but no gameplay, real Bluetooth connection, routing, backend, or persistence.
+This repository currently contains the Phase 3 executable gray box for Thrumshift. It includes a browser-independent heart-rate packet parser, deterministic simulated telemetry, and a narrow Web Bluetooth heart-rate adapter, but no gameplay, routing, backend, or persistence.
 
 ## Requirements
 
@@ -20,9 +20,25 @@ npx playwright install chromium
 
 Start the development server with `npm run dev`, then open the local URL Vite prints.
 
-Development builds show the single telemetry diagnostics panel beneath the product gray box. Connect the simulator, enter BPM and an optional RR-interval value (leave RR blank to omit it), emit samples or errors, and disconnect/reconnect. The panel uses the same application composition root and is removed from production builds; `npm run build && npm run e2e` verifies that exclusion.
+Development builds show the single telemetry diagnostics panel beneath the product gray box. Select Simulator to enter BPM and an optional RR-interval value (leave RR blank to omit it), emit samples or errors, and disconnect/reconnect. Select Web Bluetooth and use “Choose heart-rate monitor” to open the browser chooser from that explicit button gesture. Capability, connection, BPM, RR, disconnect, and recoverable error states appear in the same panel.
 
-Automated component tests inject `SimulatedHeartRateSource` at the application telemetry boundary rather than mocking domain modules. The reusable telemetry-source contract suite checks the same lifecycle and delivery behavior against the simulator and is available to later source adapters.
+Web Bluetooth requires Android Chrome or another compatible Chromium browser on HTTPS or localhost. The adapter requests only devices advertising the standard Heart Rate Service and subscribes to Heart Rate Measurement notifications. It does not automatically reconnect or remember a device.
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for the tested temporary-HTTPS workflow used to open the development diagnostics on a phone.
+
+Automated component tests inject telemetry sources at the application boundary rather than mocking domain modules. The reusable telemetry-source contract suite runs against both simulated and Web Bluetooth adapters. Web Bluetooth tests use the narrow injected browser port; automated tests never open a real chooser. The diagnostics panel is removed from production builds, and `npm run build && npm run e2e` verifies that exclusion.
+
+## Web Bluetooth hardware check
+
+1. Serve the development app from localhost or an HTTPS origin and open it in Android Chrome.
+2. Turn on and wear the heart-rate monitor according to its manufacturer instructions.
+3. Select Web Bluetooth, choose “Choose heart-rate monitor,” and select the monitor in Chrome’s chooser.
+4. Confirm connecting becomes connected and live BPM values appear.
+5. Intentionally disconnect or power off the monitor; confirm a recoverable disconnected error appears.
+6. Choose the monitor again and verify values resume without duplicate notifications.
+7. Record the phone model, Android and Chrome versions, monitor model/firmware, notification cadence, and whether RR intervals actually appear. Absence of observed RR intervals is not evidence of incompatibility, and the MVP does not claim RR support for an untested monitor.
+8. Deny or cancel the chooser once and confirm the error is understandable and retryable.
+9. In a browser without Web Bluetooth, confirm the panel reports that the capability is unavailable.
 
 ## Quality commands
 

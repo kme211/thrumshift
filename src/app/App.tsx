@@ -1,3 +1,10 @@
+import { SimulatedHeartRateSource } from '../telemetry/simulated/SimulatedHeartRateSource'
+import { TelemetryDiagnostics } from './TelemetryDiagnostics'
+
+const developmentTelemetrySource = import.meta.env.DEV
+  ? new SimulatedHeartRateSource({ now: () => performance.now() })
+  : null
+
 export function App() {
   return (
     <main className="min-h-dvh pt-[max(var(--space-page),env(safe-area-inset-top))] pr-[max(var(--space-page),env(safe-area-inset-right))] pb-[max(var(--space-page),env(safe-area-inset-bottom))] pl-[max(var(--space-page),env(safe-area-inset-left))] sm:pt-[max(3rem,env(safe-area-inset-top))] sm:pr-[max(2.5rem,env(safe-area-inset-right))] sm:pb-[max(3rem,env(safe-area-inset-bottom))] sm:pl-[max(2.5rem,env(safe-area-inset-left))]">
@@ -30,6 +37,9 @@ export function App() {
           </div>
         </div>
       </section>
+      {developmentTelemetrySource === null ? null : (
+        <TelemetryDiagnostics source={developmentTelemetrySource} />
+      )}
     </main>
   )
 }

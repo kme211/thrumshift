@@ -12,6 +12,9 @@ test('shows the Phase 1 entry screen without horizontal overflow', async ({
   await expect(
     page.getByRole('heading', { level: 2, name: 'Reactor Cooling Failure' }),
   ).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Development telemetry diagnostics' }),
+  ).toHaveCount(0)
 
   const hasHorizontalOverflow = await page.evaluate(
     () =>

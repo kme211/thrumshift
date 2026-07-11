@@ -1,0 +1,11 @@
+:root {
+  color-scheme: dark;
+  --color-canvas: #10171b;
+  --color-surface: #182126;
+  --color-border: #66808d;
+  --color-text: #f4f8fa;
+  --color-text-muted: #c4d0d6;
+  --color-accent: #65d5e8;
+  --color-focus: #f5c451;
+  --space-page: 1rem;
+}

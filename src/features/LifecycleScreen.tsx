@@ -1,13 +1,10 @@
 import { useEffect, useRef } from 'react'
 
 import type { AppState } from '../app/AppState'
-import type {
-  ShellMissionState,
-  ShellResult,
-  ShellWarmupState,
-} from '../app/ShellState'
+import type { WarmupSession } from '../app/WarmupFlowController'
+import type { ShellMissionState, ShellResult } from '../app/ShellState'
 
-type ShellAppState = AppState<ShellWarmupState, ShellMissionState, ShellResult>
+type ShellAppState = AppState<WarmupSession, ShellMissionState, ShellResult>
 
 interface ScreenContent {
   readonly eyebrow: string
@@ -28,15 +25,13 @@ function getScreenContent(state: ShellAppState): ScreenContent {
       return {
         eyebrow: 'Operator preparation',
         heading: 'Warm-up',
-        description:
-          'Warm-up status and qualification controls arrive in Gate 5.',
+        description: 'Establish a stable operational signal before launch.',
       }
     case 'countdown':
       return {
         eyebrow: 'Launch sequence',
         heading: 'Mission countdown',
-        description:
-          'Countdown timing and qualification rules arrive in Gate 5.',
+        description: 'Maintain qualification until the launch sequence ends.',
       }
     case 'activeMission':
       return {
@@ -78,7 +73,17 @@ function getFocusKey(state: ShellAppState): string {
   return state.phase
 }
 
-export function LifecycleScreen({ state }: { readonly state: ShellAppState }) {
+interface LifecycleScreenProps {
+  readonly state: ShellAppState
+  readonly onReconnect?: () => void
+  readonly onBackToBriefing?: () => void
+}
+
+export function LifecycleScreen({
+  state,
+  onReconnect,
+  onBackToBriefing,
+}: LifecycleScreenProps) {
   const headingRef = useRef<HTMLHeadingElement>(null)
   const content = getScreenContent(state)
   const focusKey = getFocusKey(state)
@@ -122,6 +127,21 @@ export function LifecycleScreen({ state }: { readonly state: ShellAppState }) {
                   <li key={reason}>{reason}</li>
                 ))}
               </ul>
+              {state.resumeTarget.phase !== 'activeMission' ? (
+                <div className="mt-5 flex flex-wrap gap-3">
+                  {state.reasons.includes('disconnect') &&
+                  onReconnect !== undefined ? (
+                    <button type="button" onClick={onReconnect}>
+                      Reconnect heart-rate monitor
+                    </button>
+                  ) : null}
+                  {onBackToBriefing === undefined ? null : (
+                    <button type="button" onClick={onBackToBriefing}>
+                      Return to briefing
+                    </button>
+                  )}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>

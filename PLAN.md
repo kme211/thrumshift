@@ -26,6 +26,14 @@ Implementation is approval-gated:
 
 No phase may bundle unrelated refactoring. Logical commits are recommended below, but commits should be created only when requested.
 
+### Durable production naming
+
+- Gate and phase identifiers belong only in planning, review, and commit documentation.
+- Production names must describe enduring product, domain, platform, or architectural responsibilities.
+- Release-stage terms such as MVP must not appear in production identifiers unless the value is intentionally release-specific and is expected to be removed with that release.
+- Development diagnostics must be named for their diagnostic responsibility, not the gate in which they were introduced.
+- Code must remain understandable without knowing the implementation sequence.
+
 ## 3. Recommended architecture
 
 ### Technology choices
@@ -512,7 +520,7 @@ The Operator can connect or simulate a monitor, configure a target range, read s
 
 **Proposed modules or files**
 
-`src/config/mvpTuning.ts`, `src/domain/heart-rate/classifyRange.ts`, `stabilizeRange.ts`, `src/domain/mission/warmup.ts`, pre-mission/warm-up feature components, `BioLinkStatus`, `OperationalRangeGauge`, `WarmupProgress`, and target-range controls.
+`src/config/gameplayTuning.ts`, `src/domain/heart-rate/classifyRange.ts`, `stabilizeRange.ts`, `src/domain/mission/warmup.ts`, pre-mission/warm-up feature components, `BioLinkStatus`, `OperationalRangeGauge`, `WarmupProgress`, and target-range controls.
 
 **Important design decisions**
 

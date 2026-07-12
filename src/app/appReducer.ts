@@ -16,7 +16,13 @@ import { getRunId } from './AppState'
 export const appTransitionTable = {
   preMission: ['warmupStarted'],
   warming: ['warmupUpdated', 'countdownStarted', 'suspended', 'runAbandoned'],
-  countdown: ['warmupUpdated', 'missionStarted', 'suspended', 'runAbandoned'],
+  countdown: [
+    'countdownUpdated',
+    'warmupUpdated',
+    'missionStarted',
+    'suspended',
+    'runAbandoned',
+  ],
   activeMission: ['missionUpdated', 'suspended', 'runEnded', 'runAbandoned'],
   suspended: {
     warming: [
@@ -116,6 +122,8 @@ export function appReducer<WarmupState, MissionState, Result>(
 
     case 'countdown':
       switch (event.type) {
+        case 'countdownUpdated':
+          return { ...state, warmup: event.warmup }
         case 'warmupUpdated':
           return { phase: 'warming', runId: state.runId, warmup: event.warmup }
         case 'missionStarted':

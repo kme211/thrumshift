@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { defaultMvpTuning } from '../../config/mvpTuning'
-import type { MvpTuning } from '../../config/mvpTuning'
+import { defaultGameplayTuning } from '../../config/gameplayTuning'
+import type { HeartRateClassifierTuning } from '../../config/gameplayTuning'
 import {
   createClassifierState,
   transitionClassifier,
@@ -10,7 +10,7 @@ import {
 import type { ClassifierFact, ClassifierState } from './classifier'
 
 const range = { lowerBpm: 100, upperBpm: 140 }
-const tuning = defaultMvpTuning.heartRate
+const tuning = defaultGameplayTuning.heartRateClassifier
 
 function run(
   facts: readonly ClassifierFact[],
@@ -27,12 +27,12 @@ function sample(occurrenceTimeMs: number, bpm: number): ClassifierFact {
   return { type: 'sample', occurrenceTimeMs, bpm }
 }
 
-function immediateTuning(): MvpTuning['heartRate'] {
+function immediateTuning(): HeartRateClassifierTuning {
   return {
     ...tuning,
-    rollingWindowMs: 10_000,
-    rollingSampleLimit: 1,
-    minimumSamplesInWindow: 1,
+    filterWindowMs: 10_000,
+    filterSampleLimit: 1,
+    minimumValidSamplesInDensityWindow: 1,
     staleAfterMs: 10_000,
     classificationDwellMs: 1_000,
   }
@@ -72,6 +72,58 @@ describe('target range and raw BPM boundaries', () => {
 })
 
 describe('rolling signal policy', () => {
+  it('keeps filter and valid-data density horizons independent', () => {
+    expect(tuning).toMatchObject({
+      filterWindowMs: 3_000,
+      validDataDensityWindowMs: 4_000,
+      minimumValidSamplesInDensityWindow: 3,
+      staleAfterMs: 3_000,
+    })
+  })
+
+  it('keeps an established classification usable across captured HR6 cadence gaps', () => {
+    let state = createClassifierState(0)
+    const sampleTimes = [0, 1_094, 2_190, 3_284, 4_380, 5_474, 6_570]
+    for (const time of sampleTimes) {
+      if (time > 0) {
+        state = transitionClassifier(
+          state,
+          { type: 'timeAdvanced', occurrenceTimeMs: time - 80 },
+          range,
+          tuning,
+        ).state
+        if (time >= 4_380) {
+          expect(state.signalQuality).toBe('usable')
+          expect(state.stableClassification).toBe('operational')
+          expect(state.filteredBpm).toBe(110)
+        }
+      }
+      state = transitionClassifier(
+        state,
+        sample(time, 110),
+        range,
+        tuning,
+      ).state
+    }
+    expect(state.signalQuality).toBe('usable')
+    expect(state.stableClassification).toBe('operational')
+  })
+
+  it('does not recompute the filter from two samples on a scheduler-only advance', () => {
+    let state = run([sample(0, 100), sample(1_094, 110), sample(2_190, 120)])
+    expect(state.filteredBpm).toBe(110)
+    state = transitionClassifier(
+      state,
+      { type: 'timeAdvanced', occurrenceTimeMs: 3_080 },
+      range,
+      tuning,
+    ).state
+    expect(state.filterSamples).toHaveLength(2)
+    expect(state.validSampleTimesMs).toHaveLength(3)
+    expect(state.signalQuality).toBe('usable')
+    expect(state.filteredBpm).toBe(110)
+  })
+
   it.each([0, -1, 72.5, Number.NaN, 29, 241])(
     'rejects invalid or implausible BPM %s without replacing the latest valid BPM',
     (bpm) => {
@@ -82,7 +134,7 @@ describe('rolling signal policy', () => {
         latestValidSampleTimeMs: 0,
         signalQuality: 'invalid',
         stableClassification: null,
-        rollingSamples: [],
+        filterSamples: [],
       })
     },
   )
@@ -126,6 +178,19 @@ describe('rolling signal policy', () => {
     expect(state.stableClassification).toBeNull()
   })
 
+  it('becomes insufficient for a genuinely sparse non-stale stream', () => {
+    let state = run([sample(0, 110), sample(1_500, 110), sample(3_000, 110)])
+    expect(state.signalQuality).toBe('usable')
+    state = transitionClassifier(
+      state,
+      { type: 'timeAdvanced', occurrenceTimeMs: 4_001 },
+      range,
+      tuning,
+    ).state
+    expect(state.signalQuality).toBe('insufficient')
+    expect(state.stableClassification).toBeNull()
+  })
+
   it('invalidates alternating valid and invalid samples instead of accumulating density', () => {
     const state = run([
       sample(0, 110),
@@ -135,12 +200,58 @@ describe('rolling signal policy', () => {
       sample(2_000, 110),
     ])
     expect(state.signalQuality).toBe('insufficient')
-    expect(state.rollingSamples).toHaveLength(1)
+    expect(state.filterSamples).toHaveLength(1)
     expect(state.stableClassification).toBeNull()
   })
 })
 
 describe('hysteresis, dwell, staleness, and invalidation', () => {
+  it('is deterministic for large and small wakes across the HR6 cadence', () => {
+    const facts = [
+      sample(0, 110),
+      sample(1_094, 110),
+      sample(2_190, 110),
+      sample(3_284, 110),
+      sample(4_380, 110),
+    ]
+    const initial = run(facts)
+    const large = transitionClassifier(
+      initial,
+      { type: 'timeAdvanced', occurrenceTimeMs: 6_000 },
+      range,
+      tuning,
+    ).state
+    let small = initial
+    for (const time of [5_100, 5_300, 5_700, 6_000]) {
+      small = transitionClassifier(
+        small,
+        { type: 'timeAdvanced', occurrenceTimeMs: time },
+        range,
+        tuning,
+      ).state
+    }
+    expect(large).toEqual(small)
+    expect(large.stableClassification).toBe('operational')
+  })
+
+  it('still becomes stale three seconds after the last HR6 sample', () => {
+    const state = run([
+      sample(0, 110),
+      sample(1_094, 110),
+      sample(2_190, 110),
+      sample(3_284, 110),
+      sample(4_380, 110),
+    ])
+    const stale = transitionClassifier(
+      state,
+      { type: 'timeAdvanced', occurrenceTimeMs: 7_380 },
+      range,
+      tuning,
+    ).state
+    expect(stale.signalQuality).toBe('stale')
+    expect(stale.stableClassification).toBeNull()
+  })
+
   it('derives dwell before later staleness regardless of wake-up size', () => {
     const facts = [sample(0, 110), sample(500, 110), sample(1_000, 110)]
     const large = transitionClassifier(

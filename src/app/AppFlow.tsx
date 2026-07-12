@@ -1,24 +1,29 @@
-import { lazy, Suspense, useEffect, useReducer, useRef } from 'react'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
 
+import { PreMissionScreen } from '../features/PreMissionScreen'
+import { WarmupScreen } from '../features/WarmupScreen'
 import { LifecycleScreen } from '../features/LifecycleScreen'
-import type {
-  PageVisibility,
-  PageVisibilityChange,
-} from '../platform/PageVisibility'
+import type { MonotonicClock } from '../platform/Clock'
+import type { PageVisibility } from '../platform/PageVisibility'
+import type { Scheduler } from '../platform/Scheduler'
 import type { ScreenWakeLock } from '../platform/ScreenWakeLock'
+import type { HeartRateTelemetrySource } from '../telemetry/HeartRateTelemetrySource'
 import type { WebBluetoothHeartRateSource } from '../telemetry/bluetooth/WebBluetoothHeartRateSource'
 import type { SimulatedHeartRateSource } from '../telemetry/simulated/SimulatedHeartRateSource'
-import type { AppState } from './AppState'
-import { getRunId, initialAppState } from './AppState'
-import { appReducer } from './appReducer'
-import type {
-  ShellMissionState,
-  ShellResult,
-  ShellWarmupState,
-} from './ShellState'
-import { freshShellWarmup } from './ShellState'
-
-type State = AppState<ShellWarmupState, ShellMissionState, ShellResult>
+import {
+  canBeginWarmup,
+  createWarmupFlowState,
+  warmupFlowReducer,
+} from './WarmupFlowController'
+import type { WarmupFlowFactPayload } from './WarmupFlowController'
 
 const DevelopmentDiagnostics = import.meta.env.DEV
   ? lazy(() =>
@@ -29,90 +34,186 @@ const DevelopmentDiagnostics = import.meta.env.DEV
   : null
 
 interface AppFlowProps {
+  readonly clock: MonotonicClock
+  readonly scheduler: Scheduler
   readonly visibility: PageVisibility
   readonly wakeLock: ScreenWakeLock
-  readonly diagnostics: {
-    readonly simulatedSource: SimulatedHeartRateSource
-    readonly bluetoothSource: WebBluetoothHeartRateSource
-  } | null
+  readonly bluetoothSource: WebBluetoothHeartRateSource
+  readonly simulatedSource: SimulatedHeartRateSource | null
 }
 
-function wantsWakeLock(state: State): boolean {
+function wantsWakeLock(phase: string): boolean {
   return (
-    state.phase === 'warming' ||
-    state.phase === 'countdown' ||
-    state.phase === 'activeMission'
+    phase === 'warming' || phase === 'countdown' || phase === 'activeMission'
   )
 }
 
-export function AppFlow({ visibility, wakeLock, diagnostics }: AppFlowProps) {
+export function AppFlow({
+  clock,
+  scheduler,
+  visibility,
+  wakeLock,
+  bluetoothSource,
+  simulatedSource,
+}: AppFlowProps) {
   const [state, dispatch] = useReducer(
-    appReducer<ShellWarmupState, ShellMissionState, ShellResult>,
-    initialAppState,
+    warmupFlowReducer,
+    import.meta.env.DEV,
+    createWarmupFlowState,
   )
-  const nextRun = useRef(0)
-  const stateRef = useRef<State>(state)
-  stateRef.current = state
+  const nextFactSequence = useRef(0)
+  const dispatchFact = useCallback(
+    (fact: WarmupFlowFactPayload) =>
+      dispatch({ ...fact, sequence: ++nextFactSequence.current }),
+    [],
+  )
+  const [selectedSource, setSelectedSource] = useState<
+    'simulated' | 'bluetooth'
+  >(simulatedSource === null ? 'bluetooth' : 'simulated')
+  const source: HeartRateTelemetrySource =
+    selectedSource === 'simulated' && simulatedSource !== null
+      ? simulatedSource
+      : bluetoothSource
 
   useEffect(() => {
-    function handleVisibility(change: PageVisibilityChange): void {
-      const current = stateRef.current
-      const runId = getRunId(current)
-      if (runId === null || current.phase === 'result') return
-
-      if (change.state === 'hidden') {
-        dispatch({ type: 'suspended', runId, reason: 'hidden' })
-        return
-      }
-      if (current.phase === 'suspended' && current.reasons.includes('hidden')) {
-        const hiddenWasSoleReason =
-          current.reasons.length === 1 && current.reasons[0] === 'hidden'
-        dispatch({ type: 'suspensionCleared', runId, reason: 'hidden' })
-        if (
-          hiddenWasSoleReason &&
-          current.resumeTarget.phase !== 'activeMission'
-        ) {
-          dispatch({
-            type: 'warmupRecovered',
-            runId,
-            warmup: freshShellWarmup(),
-          })
-        }
-      }
+    const unsubscribeStatus = source.subscribeStatus((status) =>
+      dispatchFact({ type: 'status', occurredAt: clock.now(), status }),
+    )
+    const unsubscribeSamples = source.subscribeSamples((sample) =>
+      dispatchFact({ type: 'sample', sample }),
+    )
+    return () => {
+      unsubscribeStatus()
+      unsubscribeSamples()
     }
+  }, [clock, dispatchFact, source])
 
-    const unsubscribe = visibility.subscribe(handleVisibility)
-    return unsubscribe
-  }, [visibility])
+  useEffect(
+    () =>
+      visibility.subscribe((change) =>
+        dispatchFact({
+          type: 'visibility',
+          occurredAt: change.occurredAt,
+          state: change.state,
+        }),
+      ),
+    [dispatchFact, visibility],
+  )
 
   useEffect(() => {
-    void wakeLock.setActive(wantsWakeLock(state))
-  }, [state, wakeLock])
+    scheduler.cancelAll()
+    if (
+      state.lifecycle.phase !== 'warming' &&
+      state.lifecycle.phase !== 'countdown'
+    )
+      return
+    return scheduler.schedule(250, (occurredAt) =>
+      dispatchFact({
+        type: 'timeAdvanced',
+        occurredAt,
+        runGeneration: state.runGeneration,
+      }),
+    )
+  }, [dispatchFact, scheduler, state.lifecycle, state.runGeneration])
+
+  useEffect(() => {
+    void wakeLock.setActive(wantsWakeLock(state.lifecycle.phase))
+  }, [state.lifecycle.phase, wakeLock])
 
   useEffect(
     () => () => {
+      scheduler.cancelAll()
       void wakeLock.setActive(false)
     },
-    [wakeLock],
+    [scheduler, wakeLock],
   )
+
+  function selectSource(next: 'simulated' | 'bluetooth'): void {
+    if (next === selectedSource) return
+    void source.disconnect()
+    setSelectedSource(next)
+    dispatchFact({ type: 'sourceChanged', occurredAt: clock.now() })
+  }
+
+  const targetProps = {
+    targetDraft: state.targetDraft,
+    targetError: state.targetError,
+    onTargetChange: (field: 'lower' | 'upper', value: string) =>
+      dispatchFact({
+        type: 'targetDraftChanged',
+        occurredAt: clock.now(),
+        field,
+        value,
+      }),
+    onTargetCommit: () =>
+      dispatchFact({ type: 'targetCommitted', occurredAt: clock.now() }),
+  }
+
+  let screen
+  if (state.lifecycle.phase === 'preMission') {
+    screen = (
+      <PreMissionScreen
+        status={state.telemetryStatus}
+        capability={source.capability}
+        latestBpm={state.latestPreMissionBpm}
+        {...targetProps}
+        canBegin={canBeginWarmup(state)}
+        showSourceSelector={simulatedSource !== null}
+        selectedSource={selectedSource}
+        onSelectSource={selectSource}
+        onConnect={() => void source.connect()}
+        onBegin={() =>
+          dispatchFact({ type: 'beginWarmup', occurredAt: clock.now() })
+        }
+      />
+    )
+  } else if (
+    state.lifecycle.phase === 'warming' ||
+    state.lifecycle.phase === 'countdown'
+  ) {
+    screen = (
+      <WarmupScreen
+        session={state.lifecycle.warmup}
+        status={state.telemetryStatus}
+        {...targetProps}
+        onConnect={() => void source.connect()}
+        onBack={() =>
+          dispatchFact({ type: 'backToBriefing', occurredAt: clock.now() })
+        }
+      />
+    )
+  } else {
+    screen = (
+      <LifecycleScreen
+        state={state.lifecycle}
+        onReconnect={() => void source.connect()}
+        onBackToBriefing={() =>
+          dispatchFact({
+            type: 'backToBriefing',
+            occurredAt: clock.now(),
+          })
+        }
+      />
+    )
+  }
 
   return (
     <>
-      <LifecycleScreen state={state} />
-      {diagnostics === null || DevelopmentDiagnostics === null ? null : (
+      <div aria-live="polite" className="sr-only">
+        {state.announcement}
+      </div>
+      {screen}
+      {simulatedSource === null || DevelopmentDiagnostics === null ? null : (
         <Suspense fallback={null}>
           <DevelopmentDiagnostics
-            {...diagnostics}
+            simulatedSource={simulatedSource}
             state={state}
-            dispatch={dispatch}
-            startWarmup={() => {
-              nextRun.current += 1
-              dispatch({
-                type: 'warmupStarted',
-                runId: `development-run-${nextRun.current}`,
-                warmup: freshShellWarmup(),
+            onResetDiagnostics={() =>
+              dispatchFact({
+                type: 'resetDiagnostics',
+                occurredAt: clock.now(),
               })
-            }}
+            }
           />
         </Suspense>
       )}

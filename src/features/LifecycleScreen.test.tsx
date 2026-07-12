@@ -2,16 +2,14 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import type { AppState } from '../app/AppState'
-import type {
-  ShellMissionState,
-  ShellResult,
-  ShellWarmupState,
-} from '../app/ShellState'
+import { createWarmupSession } from '../app/WarmupFlowController'
+import type { WarmupSession } from '../app/WarmupFlowController'
+import type { ShellMissionState, ShellResult } from '../app/ShellState'
 import { LifecycleScreen } from './LifecycleScreen'
 
-type State = AppState<ShellWarmupState, ShellMissionState, ShellResult>
+type State = AppState<WarmupSession, ShellMissionState, ShellResult>
 const runId = 'run-shell'
-const warmup = { placeholder: 'warmup' } as const
+const warmup = createWarmupSession(0, { lowerBpm: 100, upperBpm: 140 })
 const mission = { placeholder: 'mission' } as const
 
 describe('LifecycleScreen', () => {

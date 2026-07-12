@@ -1,4 +1,4 @@
-import type { MvpTuning } from '../../config/mvpTuning'
+import type { HeartRateClassifierTuning } from '../../config/gameplayTuning'
 import { isValidHeartRateBpm } from './range'
 
 export type RangeClassification = 'below' | 'operational' | 'above'
@@ -9,6 +9,7 @@ export type ClassifierInvalidationReason =
   | 'manualSuspension'
   | 'replay'
   | 'targetRangeChanged'
+  | 'invalidSignal'
   | 'staleSignal'
   | 'invalidSample'
 
@@ -17,7 +18,7 @@ export interface TargetRange {
   readonly upperBpm: number
 }
 
-interface RollingSample {
+interface FilterSample {
   readonly occurrenceTimeMs: number
   readonly bpm: number
 }
@@ -31,7 +32,8 @@ export interface ClassifierState {
   readonly stableClassification: RangeClassification | null
   readonly candidateClassification: RangeClassification | null
   readonly candidateSinceMs: number | null
-  readonly rollingSamples: readonly RollingSample[]
+  readonly filterSamples: readonly FilterSample[]
+  readonly validSampleTimesMs: readonly number[]
   readonly lastInvalidationReason: ClassifierInvalidationReason | null
 }
 
@@ -65,7 +67,7 @@ export interface ClassifierTransition {
 
 export function validateTargetRange(
   range: TargetRange,
-  tuning: MvpTuning['heartRate'],
+  tuning: HeartRateClassifierTuning,
 ): TargetRange {
   if (
     !Number.isSafeInteger(range.lowerBpm) ||
@@ -94,7 +96,8 @@ export function createClassifierState(initialTimeMs: number): ClassifierState {
     stableClassification: null,
     candidateClassification: null,
     candidateSinceMs: null,
-    rollingSamples: [],
+    filterSamples: [],
+    validSampleTimesMs: [],
     lastInvalidationReason: null,
   }
 }
@@ -105,7 +108,7 @@ function assertTime(time: number): void {
   }
 }
 
-function median(samples: readonly RollingSample[]): number {
+function median(samples: readonly FilterSample[]): number {
   const bpms = samples.map(({ bpm }) => bpm).sort((a, b) => a - b)
   return bpms[Math.floor(bpms.length / 2)] as number
 }
@@ -142,7 +145,8 @@ function invalidate(
     stableClassification: null,
     candidateClassification: null,
     candidateSinceMs: null,
-    rollingSamples: [],
+    filterSamples: [],
+    validSampleTimesMs: [],
     lastInvalidationReason: reason,
   }
 }
@@ -151,7 +155,7 @@ function evaluateAt(
   state: ClassifierState,
   time: number,
   range: TargetRange,
-  tuning: MvpTuning['heartRate'],
+  tuning: HeartRateClassifierTuning,
 ): ClassifierTransition {
   if (
     state.latestValidSampleTimeMs !== null &&
@@ -163,27 +167,32 @@ function evaluateAt(
     }
   }
 
-  const rollingSamples = state.rollingSamples.filter(
-    (sample) => time - sample.occurrenceTimeMs <= tuning.rollingWindowMs,
+  const filterSamples = state.filterSamples.filter(
+    (sample) => time - sample.occurrenceTimeMs <= tuning.filterWindowMs,
   )
-  if (rollingSamples.length < tuning.minimumSamplesInWindow) {
+  const validSampleTimesMs = state.validSampleTimesMs.filter(
+    (sampleTime) => time - sampleTime <= tuning.validDataDensityWindowMs,
+  )
+  if (validSampleTimesMs.length < tuning.minimumValidSamplesInDensityWindow) {
     return {
       state: {
         ...state,
         lastProcessedTimeMs: time,
-        filteredBpm:
-          rollingSamples.length === 0 ? null : median(rollingSamples),
         signalQuality: 'insufficient',
         stableClassification: null,
         candidateClassification: null,
         candidateSinceMs: null,
-        rollingSamples,
+        filterSamples,
+        validSampleTimesMs,
       },
       classificationChange: null,
     }
   }
 
-  const filteredBpm = median(rollingSamples)
+  const filteredBpm = state.filteredBpm
+  if (filteredBpm === null) {
+    throw new Error('Sufficient valid-data density requires a filtered BPM')
+  }
   const proposed = rawClassification(
     filteredBpm,
     state.stableClassification,
@@ -215,7 +224,8 @@ function evaluateAt(
         stableClassification: candidateClassification,
         candidateClassification: null,
         candidateSinceMs: null,
-        rollingSamples,
+        filterSamples,
+        validSampleTimesMs,
         lastInvalidationReason: null,
       },
       classificationChange: {
@@ -235,7 +245,8 @@ function evaluateAt(
       signalQuality: 'usable',
       candidateClassification,
       candidateSinceMs,
-      rollingSamples,
+      filterSamples,
+      validSampleTimesMs,
     },
     classificationChange: null,
   }
@@ -245,7 +256,7 @@ function advance(
   state: ClassifierState,
   time: number,
   range: TargetRange,
-  tuning: MvpTuning['heartRate'],
+  tuning: HeartRateClassifierTuning,
 ): ClassifierTransition {
   assertTime(time)
   if (time < state.lastProcessedTimeMs) {
@@ -289,7 +300,7 @@ export function transitionClassifier(
   state: ClassifierState,
   fact: ClassifierFact,
   range: TargetRange,
-  tuning: MvpTuning['heartRate'],
+  tuning: HeartRateClassifierTuning,
 ): ClassifierTransition {
   validateTargetRange(range, tuning)
   const advanced = advance(state, fact.occurrenceTimeMs, range, tuning)
@@ -322,18 +333,27 @@ export function transitionClassifier(
     }
   }
 
-  const cutoff = fact.occurrenceTimeMs - tuning.rollingWindowMs
-  const rollingSamples = [
-    ...state.rollingSamples.filter(
-      (sample) => sample.occurrenceTimeMs >= cutoff,
+  const filterCutoff = fact.occurrenceTimeMs - tuning.filterWindowMs
+  const filterSamples = [
+    ...state.filterSamples.filter(
+      (sample) => sample.occurrenceTimeMs >= filterCutoff,
     ),
     { occurrenceTimeMs: fact.occurrenceTimeMs, bpm: fact.bpm },
-  ].slice(-tuning.rollingSampleLimit)
+  ].slice(-tuning.filterSampleLimit)
+  const densityCutoff = fact.occurrenceTimeMs - tuning.validDataDensityWindowMs
+  const validSampleTimesMs = [
+    ...state.validSampleTimesMs.filter(
+      (sampleTime) => sampleTime >= densityCutoff,
+    ),
+    fact.occurrenceTimeMs,
+  ].slice(-tuning.minimumValidSamplesInDensityWindow)
   const withSample: ClassifierState = {
     ...state,
     latestValidBpm: fact.bpm,
     latestValidSampleTimeMs: fact.occurrenceTimeMs,
-    rollingSamples,
+    filteredBpm: median(filterSamples),
+    filterSamples,
+    validSampleTimesMs,
   }
   const result = advance(withSample, fact.occurrenceTimeMs, range, tuning)
   return {

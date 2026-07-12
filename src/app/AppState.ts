@@ -69,6 +69,11 @@ export type AppEvent<WarmupState, MissionState, Result> =
       readonly warmup: WarmupState
     }
   | {
+      readonly type: 'countdownUpdated'
+      readonly runId: RunId
+      readonly warmup: WarmupState
+    }
+  | {
       readonly type: 'missionStarted'
       readonly runId: RunId
       readonly mission: MissionState

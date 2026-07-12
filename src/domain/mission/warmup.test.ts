@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { defaultMvpTuning } from '../../config/mvpTuning'
+import { defaultGameplayTuning } from '../../config/gameplayTuning'
 import { createWarmupState, transitionWarmup } from './warmup'
 import type { WarmupFact, WarmupState } from './warmup'
 
-const tuning = defaultMvpTuning.warmup
+const warmupTuning = defaultGameplayTuning.warmup
+const countdownTuning = defaultGameplayTuning.countdown
 const operational = (time: number): WarmupFact => ({
   type: 'classifierUpdated',
   occurrenceTimeMs: time,
@@ -18,7 +19,9 @@ const advance = (time: number): WarmupFact => ({
 
 function run(facts: readonly WarmupFact[]): WarmupState {
   let state = createWarmupState(0)
-  for (const fact of facts) state = transitionWarmup(state, fact, tuning)
+  for (const fact of facts) {
+    state = transitionWarmup(state, fact, warmupTuning, countdownTuning)
+  }
   return state
 }
 
@@ -61,8 +64,18 @@ describe('warm-up qualification and countdown', () => {
     ],
   ] as const)('resets qualification on %s', (_name, resetFact) => {
     let state = run([operational(0), advance(4_000), resetFact])
-    state = transitionWarmup(state, operational(6_000), tuning)
-    state = transitionWarmup(state, advance(15_999), tuning)
+    state = transitionWarmup(
+      state,
+      operational(6_000),
+      warmupTuning,
+      countdownTuning,
+    )
+    state = transitionWarmup(
+      state,
+      advance(15_999),
+      warmupTuning,
+      countdownTuning,
+    )
     expect(state.phase).toBe('warming')
     expect(state.operationalSinceMs).toBe(6_000)
   })
@@ -76,9 +89,15 @@ describe('warm-up qualification and countdown', () => {
         occurrenceTimeMs: 11_000,
         reason: 'manualSuspension',
       },
-      tuning,
+      warmupTuning,
+      countdownTuning,
     )
-    state = transitionWarmup(state, advance(20_000), tuning)
+    state = transitionWarmup(
+      state,
+      advance(20_000),
+      warmupTuning,
+      countdownTuning,
+    )
     expect(state).toMatchObject({
       phase: 'warming',
       qualifiedAtMs: null,
@@ -121,8 +140,8 @@ describe('warm-up qualification and countdown', () => {
 
   it('rejects out-of-order time', () => {
     const state = run([operational(5_000)])
-    expect(() => transitionWarmup(state, advance(4_999), tuning)).toThrow(
-      RangeError,
-    )
+    expect(() =>
+      transitionWarmup(state, advance(4_999), warmupTuning, countdownTuning),
+    ).toThrow(RangeError)
   })
 })

@@ -120,52 +120,61 @@ describe('appReducer', () => {
     const cases: readonly {
       state: State
       event: Event
-      expectedPhase: State['phase']
+      expectedLifecycleState: State['phase']
     }[] = [
       {
         state: { phase: 'preMission' },
         event: { type: 'warmupStarted', runId, warmup },
-        expectedPhase: 'warming',
+        expectedLifecycleState: 'warming',
       },
       {
         state: warming(),
         event: { type: 'warmupUpdated', runId, warmup: qualifiedWarmup },
-        expectedPhase: 'warming',
+        expectedLifecycleState: 'warming',
       },
       {
         state: warming(),
         event: { type: 'countdownStarted', runId, warmup: qualifiedWarmup },
-        expectedPhase: 'countdown',
+        expectedLifecycleState: 'countdown',
       },
       {
         state: warming(),
         event: { type: 'suspended', runId, reason: 'manual' },
-        expectedPhase: 'suspended',
+        expectedLifecycleState: 'suspended',
       },
       {
         state: warming(),
         event: { type: 'runAbandoned', runId },
-        expectedPhase: 'preMission',
+        expectedLifecycleState: 'preMission',
+      },
+      {
+        state: countdown(),
+        event: {
+          type: 'countdownUpdated',
+          runId,
+          warmup: qualifiedWarmup,
+        },
+        expectedLifecycleState: 'countdown',
       },
       {
         state: countdown(),
         event: { type: 'warmupUpdated', runId, warmup },
-        expectedPhase: 'warming',
+        expectedLifecycleState: 'warming',
       },
       {
         state: countdown(),
         event: { type: 'missionStarted', runId, mission },
-        expectedPhase: 'activeMission',
+        expectedLifecycleState: 'activeMission',
       },
       {
         state: countdown(),
         event: { type: 'suspended', runId, reason: 'hidden' },
-        expectedPhase: 'suspended',
+        expectedLifecycleState: 'suspended',
       },
       {
         state: countdown(),
         event: { type: 'runAbandoned', runId },
-        expectedPhase: 'preMission',
+        expectedLifecycleState: 'preMission',
       },
       {
         state: active(),
@@ -174,33 +183,33 @@ describe('appReducer', () => {
           runId,
           mission: { stability: 90 },
         },
-        expectedPhase: 'activeMission',
+        expectedLifecycleState: 'activeMission',
       },
       {
         state: active(),
         event: { type: 'suspended', runId, reason: 'disconnect' },
-        expectedPhase: 'suspended',
+        expectedLifecycleState: 'suspended',
       },
       {
         state: active(),
         event: { type: 'runEnded', runId, result: success },
-        expectedPhase: 'result',
+        expectedLifecycleState: 'result',
       },
       {
         state: active(),
         event: { type: 'runAbandoned', runId },
-        expectedPhase: 'preMission',
+        expectedLifecycleState: 'preMission',
       },
       {
         state: { phase: 'result', runId, result: success },
         event: { type: 'runAgain' },
-        expectedPhase: 'preMission',
+        expectedLifecycleState: 'preMission',
       },
     ]
 
     for (const testCase of cases) {
       expect(reduce(testCase.state, testCase.event).phase).toBe(
-        testCase.expectedPhase,
+        testCase.expectedLifecycleState,
       )
     }
   })

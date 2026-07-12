@@ -1,14 +1,14 @@
-import type { MvpTuning } from '../../config/mvpTuning'
+import type { CountdownTuning, WarmupTuning } from '../../config/gameplayTuning'
 import type {
   RangeClassification,
   SignalQuality,
 } from '../heart-rate/classifier'
 
-export type WarmupPhase = 'warming' | 'countdown' | 'complete'
+export type WarmupStage = 'warming' | 'countdown' | 'complete'
 
 export interface WarmupState {
   readonly lastProcessedTimeMs: number
-  readonly phase: WarmupPhase
+  readonly phase: WarmupStage
   readonly signalQuality: SignalQuality
   readonly stableClassification: RangeClassification | null
   readonly operationalSinceMs: number | null
@@ -57,7 +57,8 @@ export function createWarmupState(initialTimeMs: number): WarmupState {
 function advanceWarmup(
   state: WarmupState,
   time: number,
-  tuning: MvpTuning['warmup'],
+  warmupTuning: WarmupTuning,
+  countdownTuning: CountdownTuning,
 ): WarmupState {
   if (!Number.isFinite(time) || time < state.lastProcessedTimeMs) {
     throw new RangeError('Warm-up facts must be processed in monotonic order')
@@ -71,7 +72,7 @@ function advanceWarmup(
     next.stableClassification === 'operational' &&
     next.operationalSinceMs !== null
   ) {
-    const qualifiedAtMs = next.operationalSinceMs + tuning.qualificationMs
+    const qualifiedAtMs = next.operationalSinceMs + warmupTuning.qualificationMs
     if (time >= qualifiedAtMs) {
       next = {
         ...next,
@@ -84,9 +85,9 @@ function advanceWarmup(
   if (
     next.phase === 'countdown' &&
     next.countdownStartedAtMs !== null &&
-    time >= next.countdownStartedAtMs + tuning.countdownMs
+    time >= next.countdownStartedAtMs + countdownTuning.durationMs
   ) {
-    const completedAtMs = next.countdownStartedAtMs + tuning.countdownMs
+    const completedAtMs = next.countdownStartedAtMs + countdownTuning.durationMs
     return { ...next, phase: 'complete', completedAtMs }
   }
   return next
@@ -114,9 +115,15 @@ function reset(
 export function transitionWarmup(
   state: WarmupState,
   fact: WarmupFact,
-  tuning: MvpTuning['warmup'],
+  warmupTuning: WarmupTuning,
+  countdownTuning: CountdownTuning,
 ): WarmupState {
-  const advanced = advanceWarmup(state, fact.occurrenceTimeMs, tuning)
+  const advanced = advanceWarmup(
+    state,
+    fact.occurrenceTimeMs,
+    warmupTuning,
+    countdownTuning,
+  )
   if (advanced.phase === 'complete' || fact.type === 'timeAdvanced') {
     return advanced
   }
@@ -140,4 +147,29 @@ export function transitionWarmup(
     stableClassification: fact.stableClassification,
     operationalSinceMs: advanced.operationalSinceMs ?? fact.occurrenceTimeMs,
   }
+}
+
+export function getWarmupProgressMs(
+  state: WarmupState,
+  qualificationMs: number,
+): number {
+  if (state.qualifiedAtMs !== null) return qualificationMs
+  if (state.operationalSinceMs === null) return 0
+  return Math.min(
+    qualificationMs,
+    Math.max(0, state.lastProcessedTimeMs - state.operationalSinceMs),
+  )
+}
+
+export function getCountdownRemainingMs(
+  state: WarmupState,
+  countdownMs: number,
+): number | null {
+  if (state.phase !== 'countdown' || state.countdownStartedAtMs === null) {
+    return null
+  }
+  return Math.max(
+    0,
+    state.countdownStartedAtMs + countdownMs - state.lastProcessedTimeMs,
+  )
 }

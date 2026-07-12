@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('shows the Gate 4B pre-mission shell without horizontal overflow', async ({
+test('shows the pre-mission flow without horizontal overflow', async ({
   page,
 }) => {
   await page.goto('/')

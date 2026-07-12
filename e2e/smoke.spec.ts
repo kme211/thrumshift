@@ -1,20 +1,32 @@
 import { expect, test } from '@playwright/test'
 
-test('shows the Phase 1 entry screen without horizontal overflow', async ({
+test('shows the Gate 4B pre-mission shell without horizontal overflow', async ({
   page,
 }) => {
   await page.goto('/')
 
   await expect(page).toHaveTitle('Thrumshift')
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Thrumshift' }),
-  ).toBeVisible()
-  await expect(
-    page.getByRole('heading', { level: 2, name: 'Reactor Cooling Failure' }),
+    page.getByRole('heading', { level: 1, name: 'Reactor Cooling Failure' }),
   ).toBeVisible()
   await expect(
     page.getByRole('heading', { name: 'Development telemetry diagnostics' }),
   ).toHaveCount(0)
+  await expect(
+    page.getByRole('heading', { name: 'Development diagnostics' }),
+  ).toHaveCount(0)
+
+  const productionScripts = await page
+    .locator('script[src]')
+    .evaluateAll((scripts) =>
+      scripts.map((script) => (script as HTMLScriptElement).src),
+    )
+  for (const scriptUrl of productionScripts) {
+    const script = await page.request.get(scriptUrl)
+    const source = await script.text()
+    expect(source).not.toContain('Development diagnostics')
+    expect(source).not.toContain('Begin fake warm-up')
+  }
 
   const hasHorizontalOverflow = await page.evaluate(
     () =>
@@ -30,7 +42,9 @@ test('removes nonessential transition time when reduced motion is requested', as
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
 
-  const productRegion = page.getByRole('region', { name: 'Thrumshift' })
+  const productRegion = page.getByRole('region', {
+    name: 'Reactor Cooling Failure',
+  })
   const normalTransitionDuration = await productRegion.evaluate((element) =>
     Number.parseFloat(getComputedStyle(element).transitionDuration),
   )

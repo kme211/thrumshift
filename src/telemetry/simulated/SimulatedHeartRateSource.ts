@@ -3,16 +3,13 @@ import type {
   HeartRateSample,
   HeartRateSourceIdentity,
 } from '../../domain/heart-rate/types'
+import type { MonotonicClock } from '../../platform/Clock'
 import type {
   HeartRateTelemetrySource,
   TelemetryCapability,
   TelemetrySourceStatus,
   Unsubscribe,
 } from '../HeartRateTelemetrySource'
-
-export interface MonotonicClock {
-  now(): number
-}
 
 export interface SimulatedScriptPoint {
   readonly offsetMs: number

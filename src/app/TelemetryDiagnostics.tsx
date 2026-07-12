@@ -5,7 +5,7 @@ import type { TelemetrySourceStatus } from '../telemetry/HeartRateTelemetrySourc
 import { WebBluetoothHeartRateSource } from '../telemetry/bluetooth/WebBluetoothHeartRateSource'
 import { SimulatedHeartRateSource } from '../telemetry/simulated/SimulatedHeartRateSource'
 
-interface TelemetryDiagnosticsProps {
+export interface TelemetryDiagnosticsProps {
   readonly simulatedSource: SimulatedHeartRateSource
   readonly bluetoothSource: WebBluetoothHeartRateSource
 }
@@ -48,13 +48,13 @@ export function TelemetryDiagnostics({
   }, [source])
 
   return (
-    <aside
-      className="mx-auto mt-6 max-w-3xl border border-dashed border-[var(--color-border)] p-4"
+    <section
+      className="mt-6 border-t border-dashed border-[var(--color-border)] pt-4"
       aria-labelledby="telemetry-diagnostics-heading"
     >
-      <h2 id="telemetry-diagnostics-heading" className="text-lg font-semibold">
+      <h3 id="telemetry-diagnostics-heading" className="font-semibold">
         Development telemetry diagnostics
-      </h2>
+      </h3>
       <fieldset className="mt-3 flex flex-wrap gap-4">
         <legend className="text-sm font-semibold">Telemetry source</legend>
         <label>
@@ -164,6 +164,6 @@ export function TelemetryDiagnostics({
           Disconnect
         </button>
       </div>
-    </aside>
+    </section>
   )
 }

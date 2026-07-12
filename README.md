@@ -2,7 +2,7 @@
 
 Stay in range. Keep the station alive.
 
-This repository currently contains the Phase 3 executable gray box for Thrumshift. It includes a browser-independent heart-rate packet parser, deterministic simulated telemetry, and a narrow Web Bluetooth heart-rate adapter, but no gameplay, routing, backend, or persistence.
+This repository currently contains the Gate 4B executable gray-box flow for Thrumshift. It includes the lifecycle reducer, semantic shells, monotonic clock and scheduler boundaries, visibility handling, a best-effort Screen Wake Lock adapter, deterministic simulated telemetry, and a narrow Web Bluetooth heart-rate adapter. It does not include heart-rate classification, warm-up qualification, gameplay, puzzle behavior, metrics, routing, backend, or persistence.
 
 ## Requirements
 
@@ -20,7 +20,9 @@ npx playwright install chromium
 
 Start the development server with `npm run dev`, then open the local URL Vite prints.
 
-Development builds show the single telemetry diagnostics panel beneath the product gray box. Select Simulator to enter BPM and an optional RR-interval value (leave RR blank to omit it), emit samples or errors, and disconnect/reconnect. Select Web Bluetooth and use “Choose heart-rate monitor” to open the browser chooser from that explicit button gesture. Capability, connection, BPM, RR, disconnect, and recoverable error states appear in the same panel.
+Development builds show one diagnostics panel beneath the product gray box. Its lifecycle controls exercise pre-mission, warm-up, countdown, active mission, pause/disconnect, success/failure, recovery, abandonment, and run-again shells using placeholder state only. The telemetry section retains the Phase 3 simulator and Web Bluetooth controls. Select Simulator to enter BPM and an optional RR-interval value (leave RR blank to omit it), emit samples or errors, and disconnect/reconnect. Select Web Bluetooth and use “Choose heart-rate monitor” to open the browser chooser from that explicit button gesture.
+
+The lifecycle shells intentionally contain no target-range, signal-quality, warm-up timing, puzzle, stability, outcome, or result-metric rules. Backgrounding any live shell adds the hidden suspension reason. Restoring an active mission leaves it paused until explicit resume; restoring warm-up/countdown returns through the fresh placeholder warm-up path. Wake Lock is requested only for unsuspended warm-up, countdown, and active-mission shells, and unsupported or rejected requests never block navigation.
 
 Web Bluetooth requires Android Chrome or another compatible Chromium browser on HTTPS or localhost. The adapter requests only devices advertising the standard Heart Rate Service and subscribes to Heart Rate Measurement notifications. It does not automatically reconnect or remember a device.
 

@@ -2,6 +2,7 @@ import type {
   HeartRateSample,
   HeartRateSourceIdentity,
 } from '../../domain/heart-rate/types'
+import type { MonotonicClock } from '../../platform/Clock'
 import type {
   HeartRateTelemetrySource,
   TelemetryCapability,
@@ -9,7 +10,6 @@ import type {
   TelemetrySourceStatus,
   Unsubscribe,
 } from '../HeartRateTelemetrySource'
-import type { MonotonicClock } from '../simulated/SimulatedHeartRateSource'
 import { detectBluetoothCapability } from './bluetoothCapabilities'
 import {
   HEART_RATE_MEASUREMENT_CHARACTERISTIC,

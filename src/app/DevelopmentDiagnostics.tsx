@@ -1,6 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
-import type { SimulatedHeartRateSource } from '../telemetry/simulated/SimulatedHeartRateSource'
+import {
+  SIMULATED_HR6_CADENCE_MS,
+  type ContinuousEmissionState,
+  type SimulatedHeartRateSource,
+} from '../telemetry/simulated/SimulatedHeartRateSource'
 import type { WarmupFlowState } from './WarmupFlowController'
 import { downloadDiagnosticLog } from './diagnosticExport'
 
@@ -13,7 +17,15 @@ export function DevelopmentDiagnostics({
   readonly state: WarmupFlowState
   readonly onResetDiagnostics: () => void
 }) {
-  const [bpm, setBpm] = useState('110')
+  const [emission, setEmission] = useState<ContinuousEmissionState>(() =>
+    simulatedSource.getContinuousEmissionState(),
+  )
+  const [bpm, setBpm] = useState(() => String(emission.bpm))
+  const [cadence, setCadence] = useState(() => String(emission.cadenceMs))
+  useEffect(
+    () => simulatedSource.subscribeContinuousEmission(setEmission),
+    [simulatedSource],
+  )
   const diagnosticLog = state.diagnosticLog
   return (
     <aside
@@ -39,15 +51,56 @@ export function DevelopmentDiagnostics({
           className="mt-1 min-h-12 w-full border border-[var(--color-border)] bg-[var(--color-canvas)] px-3"
           type="number"
           value={bpm}
-          onChange={(event) => setBpm(event.currentTarget.value)}
+          onChange={(event) => {
+            const value = event.currentTarget.value
+            setBpm(value)
+            const nextBpm = Number(value)
+            if (
+              emission.running &&
+              value.trim() !== '' &&
+              Number.isInteger(nextBpm) &&
+              nextBpm > 0
+            )
+              simulatedSource.setContinuousBpm(nextBpm)
+          }}
         />
       </label>
+      <label className="mt-3 block">
+        <span className="block text-sm">Sample cadence (ms)</span>
+        <input
+          className="mt-1 min-h-12 w-full border border-[var(--color-border)] bg-[var(--color-canvas)] px-3"
+          type="number"
+          min="1"
+          value={cadence}
+          onChange={(event) => setCadence(event.currentTarget.value)}
+        />
+      </label>
+      <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+        HR6 observed cadence preset: approximately{' '}
+        {SIMULATED_HR6_CADENCE_MS.toLocaleString()} ms. Continuous samples:{' '}
+        {emission.running ? 'running' : 'stopped'}.
+      </p>
       <div className="mt-3 flex flex-wrap gap-3">
         <button
           type="button"
           onClick={() => simulatedSource.emitSample(Number(bpm))}
         >
           Emit simulated sample
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            simulatedSource.startContinuousSamples(Number(bpm), Number(cadence))
+          }
+        >
+          {emission.running ? 'Restart Samples' : 'Start Samples'}
+        </button>
+        <button
+          type="button"
+          disabled={!emission.running}
+          onClick={() => simulatedSource.stopContinuousSamples()}
+        >
+          Stop Samples
         </button>
         <button
           type="button"

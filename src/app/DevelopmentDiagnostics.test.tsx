@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 
+import { SimulatedHeartRateSource } from '../telemetry/simulated/SimulatedHeartRateSource'
 import {
   createWarmupFlowState,
   warmupFlowReducer,
@@ -8,6 +10,7 @@ import {
   createDiagnosticLogExport,
   serializeDiagnosticLog,
 } from './diagnosticExport'
+import { DevelopmentDiagnostics } from './DevelopmentDiagnostics'
 
 describe('development diagnostic export', () => {
   it('exports serializable schema-versioned environment, configuration, state, and events', () => {
@@ -51,5 +54,29 @@ describe('development diagnostic export', () => {
     })
     expect(parsed).toHaveProperty('configuration.classifierTuning')
     expect(() => JSON.stringify(diagnosticExport)).not.toThrow()
+  })
+})
+
+describe('DevelopmentDiagnostics', () => {
+  it('controls source-owned continuous emission without owning its lifecycle', async () => {
+    vi.useFakeTimers()
+    const source = new SimulatedHeartRateSource({ now: () => 0 })
+    const samples = vi.fn()
+    source.subscribeSamples(samples)
+    await source.connect()
+    const view = render(
+      <DevelopmentDiagnostics
+        simulatedSource={source}
+        state={createWarmupFlowState(true)}
+        onResetDiagnostics={vi.fn()}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Start Samples' }))
+    view.unmount()
+    await vi.advanceTimersByTimeAsync(1_095)
+    expect(samples).toHaveBeenCalledTimes(2)
+    expect(source.getContinuousEmissionState().running).toBe(true)
+    source.stopContinuousSamples()
+    vi.useRealTimers()
   })
 })

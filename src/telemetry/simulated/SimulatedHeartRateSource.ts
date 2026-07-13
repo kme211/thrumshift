@@ -17,6 +17,24 @@ export interface SimulatedScriptPoint {
   readonly rrIntervalsMs?: readonly number[]
 }
 
+export const SIMULATED_HR6_CADENCE_MS = 1_095
+
+export interface ContinuousEmissionState {
+  readonly running: boolean
+  readonly bpm: number
+  readonly cadenceMs: number
+}
+
+interface SimulatedTimerPort {
+  setTimeout(callback: () => void, delayMs: number): unknown
+  clearTimeout(handle: unknown): void
+}
+
+const browserTimers: SimulatedTimerPort = {
+  setTimeout: (callback, delayMs) => globalThis.setTimeout(callback, delayMs),
+  clearTimeout: (handle) => globalThis.clearTimeout(handle as number),
+}
+
 export class SimulatedHeartRateSource implements HeartRateTelemetrySource {
   readonly identity: HeartRateSourceIdentity
   readonly capability: TelemetryCapability = { supported: true }
@@ -29,10 +47,21 @@ export class SimulatedHeartRateSource implements HeartRateTelemetrySource {
     (sample: HeartRateSample) => void
   >()
   private disposed = false
+  private emissionGeneration = 0
+  private emissionHandle: unknown | null = null
+  private continuousEmission: ContinuousEmissionState = {
+    running: false,
+    bpm: 110,
+    cadenceMs: SIMULATED_HR6_CADENCE_MS,
+  }
+  private readonly emissionListeners = new Set<
+    (state: ContinuousEmissionState) => void
+  >()
 
   constructor(
     private readonly clock: MonotonicClock,
     id = 'simulated-heart-rate',
+    private readonly timers: SimulatedTimerPort = browserTimers,
   ) {
     this.identity = { id, type: 'simulated' }
   }
@@ -60,6 +89,55 @@ export class SimulatedHeartRateSource implements HeartRateTelemetrySource {
     return () => this.sampleListeners.delete(listener)
   }
 
+  getContinuousEmissionState(): ContinuousEmissionState {
+    return this.continuousEmission
+  }
+
+  subscribeContinuousEmission(
+    listener: (state: ContinuousEmissionState) => void,
+  ): Unsubscribe {
+    if (this.disposed) return () => undefined
+    this.emissionListeners.add(listener)
+    listener(this.continuousEmission)
+    return () => this.emissionListeners.delete(listener)
+  }
+
+  startContinuousSamples(bpm: number, cadenceMs: number): void {
+    if (this.disposed) return
+    if (!isValidHeartRateBpm(bpm)) {
+      this.emitError('Simulator received an invalid BPM value')
+      return
+    }
+    if (!Number.isFinite(cadenceMs) || cadenceMs <= 0) {
+      this.emitError('Simulator received an invalid emission cadence')
+      return
+    }
+    this.cancelEmissionSchedule()
+    const generation = this.emissionGeneration
+    this.continuousEmission = { running: true, bpm, cadenceMs }
+    this.publishEmissionState()
+    this.emitSample(bpm)
+    this.scheduleNextEmission(generation)
+  }
+
+  setContinuousBpm(bpm: number): void {
+    if (this.disposed || !isValidHeartRateBpm(bpm)) {
+      if (!this.disposed)
+        this.emitError('Simulator received an invalid BPM value')
+      return
+    }
+    this.continuousEmission = { ...this.continuousEmission, bpm }
+    this.publishEmissionState()
+  }
+
+  stopContinuousSamples(): void {
+    if (this.disposed) return
+    this.cancelEmissionSchedule()
+    if (!this.continuousEmission.running) return
+    this.continuousEmission = { ...this.continuousEmission, running: false }
+    this.publishEmissionState()
+  }
+
   async connect(): Promise<void> {
     if (this.disposed || this.status.state === 'connected') {
       return
@@ -69,6 +147,7 @@ export class SimulatedHeartRateSource implements HeartRateTelemetrySource {
   }
 
   async disconnect(): Promise<void> {
+    this.stopContinuousSamples()
     if (this.disposed || this.status.state === 'disconnected') {
       return
     }
@@ -116,10 +195,45 @@ export class SimulatedHeartRateSource implements HeartRateTelemetrySource {
     if (this.disposed) {
       return
     }
+    this.cancelEmissionSchedule()
     this.disposed = true
     this.status = { state: 'disconnected' }
     this.statusListeners.clear()
     this.sampleListeners.clear()
+    this.emissionListeners.clear()
+  }
+
+  private scheduleNextEmission(generation: number): void {
+    if (
+      this.disposed ||
+      !this.continuousEmission.running ||
+      generation !== this.emissionGeneration
+    )
+      return
+    this.emissionHandle = this.timers.setTimeout(() => {
+      this.emissionHandle = null
+      if (
+        this.disposed ||
+        !this.continuousEmission.running ||
+        generation !== this.emissionGeneration
+      )
+        return
+      this.emitSample(this.continuousEmission.bpm)
+      this.scheduleNextEmission(generation)
+    }, this.continuousEmission.cadenceMs)
+  }
+
+  private cancelEmissionSchedule(): void {
+    this.emissionGeneration += 1
+    if (this.emissionHandle !== null) {
+      this.timers.clearTimeout(this.emissionHandle)
+      this.emissionHandle = null
+    }
+  }
+
+  private publishEmissionState(): void {
+    for (const listener of this.emissionListeners)
+      listener(this.continuousEmission)
   }
 
   private publishStatus(status: TelemetrySourceStatus): void {

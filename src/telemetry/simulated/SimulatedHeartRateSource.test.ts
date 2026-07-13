@@ -22,6 +22,99 @@ runHeartRateTelemetrySourceContract('SimulatedHeartRateSource', () => {
 })
 
 describe('SimulatedHeartRateSource', () => {
+  it('emits continuously at the configured cadence and uses BPM changes', async () => {
+    vi.useFakeTimers()
+    let time = 0
+    const source = new SimulatedHeartRateSource({ now: () => time })
+    const samples = vi.fn()
+    source.subscribeSamples(samples)
+    await source.connect()
+
+    source.startContinuousSamples(72, 1_095)
+    expect(samples).toHaveBeenLastCalledWith(
+      expect.objectContaining({ bpm: 72 }),
+    )
+    source.setContinuousBpm(88)
+    time = 1_095
+    await vi.advanceTimersByTimeAsync(1_095)
+
+    expect(samples).toHaveBeenLastCalledWith(
+      expect.objectContaining({ bpm: 88, occurrenceTimeMs: 1_095 }),
+    )
+    expect(source.getContinuousEmissionState()).toEqual({
+      running: true,
+      bpm: 88,
+      cadenceMs: 1_095,
+    })
+    vi.useRealTimers()
+  })
+
+  it('stop and disconnect cancel continuous emissions', async () => {
+    vi.useFakeTimers()
+    const source = new SimulatedHeartRateSource({ now: () => 0 })
+    const samples = vi.fn()
+    source.subscribeSamples(samples)
+    await source.connect()
+    source.startContinuousSamples(72, 100)
+    source.stopContinuousSamples()
+    await vi.advanceTimersByTimeAsync(500)
+    expect(samples).toHaveBeenCalledTimes(1)
+
+    source.startContinuousSamples(72, 100)
+    await source.disconnect()
+    await vi.advanceTimersByTimeAsync(500)
+    expect(samples).toHaveBeenCalledTimes(2)
+    expect(source.getContinuousEmissionState().running).toBe(false)
+    vi.useRealTimers()
+  })
+
+  it('restart keeps one schedule and rejects callbacks from old generations', async () => {
+    let nextHandle = 0
+    const callbacks = new Map<number, () => void>()
+    const clearedCallbacks: (() => void)[] = []
+    const source = new SimulatedHeartRateSource(
+      { now: () => 0 },
+      'simulated-heart-rate',
+      {
+        setTimeout(callback) {
+          callbacks.set(++nextHandle, callback)
+          return nextHandle
+        },
+        clearTimeout(handle) {
+          const callback = callbacks.get(handle as number)
+          if (callback !== undefined) clearedCallbacks.push(callback)
+          callbacks.delete(handle as number)
+        },
+      },
+    )
+    const samples = vi.fn()
+    source.subscribeSamples(samples)
+    await source.connect()
+    source.startContinuousSamples(70, 100)
+    source.startContinuousSamples(80, 200)
+
+    expect(callbacks.size).toBe(1)
+    for (const callback of clearedCallbacks) callback()
+    expect(samples).toHaveBeenCalledTimes(2)
+    expect(samples).toHaveBeenLastCalledWith(
+      expect.objectContaining({ bpm: 80 }),
+    )
+  })
+
+  it('disposal cancels pending callbacks and blocks stale generations', async () => {
+    vi.useFakeTimers()
+    const source = new SimulatedHeartRateSource({ now: () => 0 })
+    const samples = vi.fn()
+    source.subscribeSamples(samples)
+    await source.connect()
+    source.startContinuousSamples(72, 100)
+    source.dispose()
+    await vi.advanceTimersByTimeAsync(500)
+    expect(samples).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+    vi.useRealTimers()
+  })
+
   it('publishes the current status followed by deterministic connection states', async () => {
     const { clock } = createClock()
     const source = new SimulatedHeartRateSource(clock)

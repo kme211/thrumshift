@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -47,7 +47,23 @@ class FakeScheduler implements Scheduler {
   }
 }
 
-function renderFlow() {
+class FakeSimulatedTimers {
+  callback: (() => void) | null = null
+  setTimeout(callback: () => void) {
+    this.callback = callback
+    return callback
+  }
+  clearTimeout(handle: unknown) {
+    if (this.callback === handle) this.callback = null
+  }
+  wake() {
+    const callback = this.callback
+    this.callback = null
+    callback?.()
+  }
+}
+
+function renderFlow(simulatedTimers = new FakeSimulatedTimers()) {
   let time = 0
   const clock: MonotonicClock = { now: () => time }
   const scheduler = new FakeScheduler()
@@ -57,8 +73,12 @@ function renderFlow() {
     setActive: vi.fn(async () => undefined),
     dispose: vi.fn(async () => undefined),
   }
-  const simulatedSource = new SimulatedHeartRateSource(clock)
-  render(
+  const simulatedSource = new SimulatedHeartRateSource(
+    clock,
+    'simulated-heart-rate',
+    simulatedTimers,
+  )
+  const view = render(
     <AppFlow
       clock={clock}
       scheduler={scheduler}
@@ -72,6 +92,8 @@ function renderFlow() {
   )
   return {
     simulatedSource,
+    simulatedTimers,
+    view,
     scheduler,
     visibility,
     wakeLock,
@@ -82,6 +104,44 @@ function renderFlow() {
 }
 
 describe('AppFlow pre-mission and warm-up integration', () => {
+  it('keeps source-owned continuous samples running across screen transitions', async () => {
+    const { simulatedSource, simulatedTimers, setTime } = renderFlow()
+    await act(() => simulatedSource.connect())
+    act(() => simulatedSource.startContinuousSamples(110, 1_095))
+    fireEvent.click(screen.getByRole('button', { name: 'Begin Warm-Up' }))
+    setTime(1_095)
+    act(() => simulatedTimers.wake())
+    expect(await screen.findByLabelText('Latest heart rate')).toHaveTextContent(
+      '110',
+    )
+    expect(simulatedSource.getContinuousEmissionState().running).toBe(true)
+    simulatedSource.stopContinuousSamples()
+  })
+
+  it('lets Stop Samples produce normal stale-signal suspension', async () => {
+    const { scheduler, setTime, simulatedSource, simulatedTimers } =
+      renderFlow()
+    await act(() => simulatedSource.connect())
+    fireEvent.click(screen.getByRole('button', { name: 'Begin Warm-Up' }))
+    act(() => simulatedSource.startContinuousSamples(110, 1_000))
+    for (const time of [1_000, 2_000]) {
+      setTime(time)
+      act(() => simulatedTimers.wake())
+    }
+    simulatedSource.stopContinuousSamples()
+    setTime(5_001)
+    await act(() => scheduler.wake(5_001))
+    expect(await screen.findByText('staleSignal')).toBeInTheDocument()
+  })
+
+  it('stops continuous emission on application composition teardown', async () => {
+    const { simulatedSource, simulatedTimers, view } = renderFlow()
+    await act(() => simulatedSource.connect())
+    act(() => simulatedSource.startContinuousSamples(110, 1_000))
+    view.unmount()
+    simulatedTimers.wake()
+    expect(simulatedSource.getContinuousEmissionState().running).toBe(false)
+  })
   it('connects through the telemetry contract and distinguishes latest BPM from pending gameplay status', async () => {
     const user = userEvent.setup()
     const { simulatedSource, setTime } = renderFlow()

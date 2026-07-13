@@ -128,6 +128,11 @@ export function AppFlow({
     [scheduler, wakeLock],
   )
 
+  useEffect(
+    () => () => simulatedSource?.stopContinuousSamples(),
+    [simulatedSource],
+  )
+
   function selectSource(next: 'simulated' | 'bluetooth'): void {
     if (next === selectedSource) return
     void source.disconnect()

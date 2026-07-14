@@ -61,6 +61,12 @@ A Quick Tunnel URL is publicly reachable while it is running. Do not share it or
 
 No tunnel credentials, hostnames, certificates, or provider configuration belong in the repository.
 
+## Gate 6 coolant-puzzle review
+
+The development diagnostics contains the only puzzle workbench. The authored route is a 3×3 serpentine path from the source at row 1, column 1 to the reactor at row 3, column 3. Rotate row 1, column 2; row 2, column 1; and row 3, column 2 once clockwise each to reach the known three-move solution.
+
+Manual acceptance should cover touch and keyboard activation, mounted-phone distance legibility, 200% browser zoom and increased system text size, portrait/landscape state retention, reduced motion, forced colors, and screen-reader output. Each tile name reports row, column, shape or endpoint role, open sides, and whether it is receiving coolant. Reachable pipe segments use a static dashed flow treatment in addition to color; S/R markers and persistent route-status text provide endpoint and whole-puzzle meaning. Per-tile check marks are intentionally avoided because source reachability does not mean that a tile is solved.
+
 ## Phase 3 hardware observations
 
 Observed during Phase 3 review on July 11, 2026:

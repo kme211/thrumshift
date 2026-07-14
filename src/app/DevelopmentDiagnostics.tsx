@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+import { CoolantPuzzle } from '../components/mission/CoolantPuzzle'
 import {
   SIMULATED_HR6_CADENCE_MS,
   type ContinuousEmissionState,
@@ -29,7 +30,7 @@ export function DevelopmentDiagnostics({
   const diagnosticLog = state.diagnosticLog
   return (
     <aside
-      className="mx-auto mt-6 max-w-3xl border border-dashed border-[var(--color-border)] p-4"
+      className="development-diagnostics mx-auto mt-6 max-w-3xl border border-dashed border-[var(--color-border)]"
       aria-labelledby="development-diagnostics-heading"
     >
       <h2
@@ -134,6 +135,9 @@ export function DevelopmentDiagnostics({
         >
           Reset diagnostic log
         </button>
+      </div>
+      <div className="mt-6 border-t border-[var(--color-border)] pt-6">
+        <CoolantPuzzle />
       </div>
     </aside>
   )

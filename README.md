@@ -2,7 +2,7 @@
 
 Stay in range. Keep the station alive.
 
-This repository currently contains the Gate 5B pre-mission and warm-up flow for Thrumshift. It includes target-range configuration, real and simulated telemetry connection paths, stable heart-rate classification, signal-quality handling, deterministic warm-up qualification and countdown, lifecycle recovery, monotonic scheduling, visibility handling, and a best-effort Screen Wake Lock adapter. It does not include active-mission rules, puzzle behavior, metrics, routing, backend, or persistence.
+This repository currently contains the Gate 6 foundation for Thrumshift. In addition to the pre-mission and warm-up flow, it includes one pure, hand-authored coolant-routing puzzle and an isolated accessible puzzle workbench in development diagnostics. It does not include active-mission rules, mission pressure or stability, puzzle/telemetry integration, metrics, routing, backend, or persistence.
 
 ## Requirements
 
@@ -20,7 +20,7 @@ npx playwright install chromium
 
 Start the development server with `npm run dev`, then open the local URL Vite prints.
 
-Development builds show one diagnostics panel beneath the product flow. Select Simulator in the mission briefing and connect it, then start continuous samples from diagnostics to emit the selected BPM at the configurable cadence while moving through the flow. The 1,095 ms default approximates the observed HR6 cadence. BPM changes apply to subsequent samples; Stop Samples deliberately allows normal staleness testing, and one-shot emission remains available. Select Web Bluetooth in the mission briefing and use “Choose heart-rate monitor” to open the browser chooser from that explicit button gesture.
+Development builds show one diagnostics panel beneath the product flow. Its coolant workbench exposes the 3×3 authored puzzle, deterministic hint, and reset without connecting it to mission or telemetry rules. Select Simulator in the mission briefing and connect it, then start continuous samples from diagnostics to emit the selected BPM at the configurable cadence while moving through the flow. The 1,095 ms default approximates the observed HR6 cadence. BPM changes apply to subsequent samples; Stop Samples deliberately allows normal staleness testing, and one-shot emission remains available. Select Web Bluetooth in the mission briefing and use “Choose heart-rate monitor” to open the browser chooser from that explicit button gesture.
 
 The pre-mission and warm-up components render canonical heart-rate and warm-up domain values; they do not calculate signal quality, classification, qualification, or countdown validity. Backgrounding warm-up/countdown invalidates progress and returns through a fresh warm-up on recovery. Disconnect, stale signal, and target-range changes also revoke qualification. Disconnect and stale signal suspend the lifecycle and release Wake Lock; suspended warm-up offers a direct reconnect gesture when needed and a safe return to the briefing. Stale recovery requires fresh usable, stable classification. Wake Lock is requested only for unsuspended warm-up, countdown, and active-mission shells, and unsupported or rejected requests never block navigation.
 
@@ -55,9 +55,12 @@ npm run format:check
 npm test
 npm run build
 npm run e2e
+npm run e2e:puzzle
 ```
 
 `npm run e2e` serves the already-built `dist` directory through Vite preview and checks 360×640 phone and 768×1024 tablet viewports. Run `npm run build` first when invoking E2E independently.
+
+`npm run e2e:puzzle` opens the same development diagnostics entry used by the app and checks the workbench at phone/tablet sizes, a viewport orientation change, reduced motion, and a 200% zoom approximation. It does not create a second application or harness.
 
 ## Static hosting
 

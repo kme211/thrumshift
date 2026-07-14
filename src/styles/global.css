@@ -5,13 +5,11 @@
 }
 
 html {
-  min-width: 320px;
   background: var(--color-canvas);
 }
 
 body {
   margin: 0;
-  min-width: 320px;
   min-height: 100dvh;
   overflow-wrap: anywhere;
   background: var(--color-canvas);
@@ -41,6 +39,161 @@ button {
   cursor: pointer;
 }
 
+.coolant-puzzle {
+  min-width: 0;
+  max-width: 100%;
+  container-type: inline-size;
+}
+
+.coolant-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(0.35rem, 2cqi, 0.75rem);
+  min-width: 0;
+  max-width: 100%;
+  width: min(100%, 34rem);
+  margin-top: 1rem;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.development-diagnostics {
+  min-width: 0;
+  max-width: 100%;
+  padding: clamp(0.25rem, 4vw, 1rem);
+}
+
+@container (max-width: 12rem) {
+  .coolant-board {
+    gap: 0.15rem;
+  }
+
+  .coolant-tile {
+    border-width: 2px;
+    border-radius: 0.3rem;
+  }
+
+  .coolant-tile__marker {
+    top: 0.1rem;
+    left: 0.1rem;
+    min-width: 1.25rem;
+    padding: 0.1rem;
+    font-size: 0.75rem;
+  }
+}
+
+.coolant-tile {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: 1;
+  padding: 0;
+  overflow: hidden;
+  border: 3px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-surface);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.coolant-tile[data-hinted] {
+  outline: 4px dashed var(--color-hint);
+  outline-offset: -7px;
+}
+
+.coolant-tile__graphic {
+  width: 100%;
+  height: 100%;
+  animation: coolant-rotation-feedback 160ms ease-out;
+}
+
+.coolant-tile__pipe {
+  stroke: var(--color-pipe);
+  stroke-width: 16;
+  stroke-linecap: square;
+}
+
+.coolant-tile[data-receiving-coolant] .coolant-tile__pipe,
+.coolant-tile[data-receiving-coolant] .coolant-tile__junction {
+  stroke: var(--color-flow);
+}
+
+.coolant-tile__flow-pattern {
+  stroke: var(--color-canvas);
+  stroke-width: 4;
+  stroke-dasharray: 7 8;
+  stroke-linecap: butt;
+  pointer-events: none;
+}
+
+.coolant-tile__junction {
+  fill: var(--color-surface);
+  stroke: var(--color-pipe);
+  stroke-width: 7;
+}
+
+.coolant-tile__marker,
+.coolant-tile__hint {
+  position: absolute;
+  z-index: 1;
+  border: 2px solid currentColor;
+  background: var(--color-canvas);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.coolant-tile__marker {
+  top: 0.25rem;
+  left: 0.25rem;
+  min-width: 1.5rem;
+  padding: 0.2rem;
+  border-radius: 999px;
+}
+
+.coolant-tile__hint {
+  right: 0.2rem;
+  bottom: 0.2rem;
+  padding: 0.2rem;
+  color: var(--color-hint);
+  font-size: clamp(0.55rem, 3.4cqi, 0.75rem);
+  text-transform: uppercase;
+}
+
+.coolant-puzzle__status {
+  min-height: 1.75rem;
+  margin-top: 0.75rem;
+  font-weight: 700;
+}
+
+@keyframes coolant-rotation-feedback {
+  from {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (forced-colors: active) {
+  .coolant-tile,
+  .coolant-tile__marker,
+  .coolant-tile__hint {
+    forced-color-adjust: auto;
+  }
+
+  .coolant-tile__pipe,
+  .coolant-tile__junction {
+    stroke: ButtonText;
+  }
+
+  .coolant-tile__flow-pattern {
+    stroke: Canvas;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -49,5 +202,9 @@ button {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .coolant-tile__graphic {
+    animation: none;
   }
 }

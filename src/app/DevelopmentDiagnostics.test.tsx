@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
+import type { MonotonicClock } from '../platform/Clock'
 import { SimulatedHeartRateSource } from '../telemetry/simulated/SimulatedHeartRateSource'
 import {
   createWarmupFlowState,
@@ -58,6 +59,28 @@ describe('development diagnostic export', () => {
 })
 
 describe('DevelopmentDiagnostics', () => {
+  it('extends the existing diagnostics surface with the isolated puzzle workbench', () => {
+    const clock: MonotonicClock = { now: () => 0 }
+    render(
+      <DevelopmentDiagnostics
+        simulatedSource={new SimulatedHeartRateSource(clock)}
+        state={createWarmupFlowState(true)}
+        onResetDiagnostics={vi.fn()}
+      />,
+    )
+    expect(
+      screen.getByRole('heading', { name: 'Development diagnostics' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Coolant routing workbench' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('group', {
+        name: 'Three by three coolant-routing board',
+      }),
+    ).toBeInTheDocument()
+  })
+
   it('controls source-owned continuous emission without owning its lifecycle', async () => {
     vi.useFakeTimers()
     const source = new SimulatedHeartRateSource({ now: () => 0 })

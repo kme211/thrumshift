@@ -7,5 +7,8 @@
   --color-text-muted: #c4d0d6;
   --color-accent: #65d5e8;
   --color-focus: #f5c451;
-  --space-page: 1rem;
+  --color-pipe: #d7e2e7;
+  --color-flow: #65d5e8;
+  --color-hint: #f5c451;
+  --space-page: clamp(0.25rem, 4vw, 1rem);
 }

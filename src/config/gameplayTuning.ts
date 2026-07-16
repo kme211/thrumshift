@@ -27,11 +27,26 @@ export interface CountdownTuning {
   readonly durationMs: number
 }
 
+/**
+ * Stability is measured in station-stability points. Rates are points per
+ * eligible active-play second; suspension, unusable signal, and an absent
+ * stable classification contribute no elapsed mission time and no rate.
+ */
+export interface StabilityTuning {
+  readonly minimum: number
+  readonly maximum: number
+  readonly initial: number
+  readonly belowDrainPerSecond: number
+  readonly aboveDrainPerSecond: number
+  readonly operationalRecoveryPerSecond: number
+}
+
 export interface GameplayTuning {
   readonly targetRange: TargetRangeTuning
   readonly heartRateClassifier: HeartRateClassifierTuning
   readonly warmup: WarmupTuning
   readonly countdown: CountdownTuning
+  readonly stability: StabilityTuning
 }
 
 export const defaultGameplayTuning: GameplayTuning = {
@@ -53,6 +68,14 @@ export const defaultGameplayTuning: GameplayTuning = {
   },
   warmup: { qualificationMs: 10_000 },
   countdown: { durationMs: 3_000 },
+  stability: {
+    minimum: 0,
+    maximum: 100,
+    initial: 100,
+    belowDrainPerSecond: 2,
+    aboveDrainPerSecond: 3,
+    operationalRecoveryPerSecond: 1,
+  },
 }
 
 function positiveInteger(value: number, name: string): void {
@@ -61,9 +84,62 @@ function positiveInteger(value: number, name: string): void {
   }
 }
 
+function finiteNumber(value: unknown, name: string): asserts value is number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new RangeError(`${name} must be a finite number`)
+  }
+}
+
+export function validateStabilityTuning(tuning: unknown): StabilityTuning {
+  if (typeof tuning !== 'object' || tuning === null) {
+    throw new RangeError('stability tuning must be an object')
+  }
+  const runtimeTuning = tuning as Record<PropertyKey, unknown>
+  const requiredProperties = [
+    'minimum',
+    'maximum',
+    'initial',
+    'belowDrainPerSecond',
+    'aboveDrainPerSecond',
+    'operationalRecoveryPerSecond',
+  ] as const
+  for (const name of requiredProperties) {
+    if (!Object.hasOwn(tuning, name)) {
+      throw new RangeError(`stability.${name} is required`)
+    }
+    finiteNumber(runtimeTuning[name], `stability.${name}`)
+  }
+  const {
+    aboveDrainPerSecond,
+    belowDrainPerSecond,
+    initial,
+    maximum,
+    minimum,
+    operationalRecoveryPerSecond,
+  } = runtimeTuning as unknown as StabilityTuning
+  if (minimum >= maximum) {
+    throw new RangeError('stability.minimum must be below maximum')
+  }
+  if (initial <= minimum || initial > maximum) {
+    throw new RangeError(
+      'stability.initial must be above minimum and no greater than maximum',
+    )
+  }
+  if (belowDrainPerSecond <= 0 || aboveDrainPerSecond <= 0) {
+    throw new RangeError('stability drain rates must be positive')
+  }
+  if (operationalRecoveryPerSecond < 0) {
+    throw new RangeError(
+      'stability.operationalRecoveryPerSecond must be nonnegative',
+    )
+  }
+  return runtimeTuning as unknown as StabilityTuning
+}
+
 /** Validates configuration once at the composition boundary, never in a timer. */
 export function validateGameplayTuning(tuning: GameplayTuning): GameplayTuning {
-  const { countdown, heartRateClassifier, targetRange, warmup } = tuning
+  const { countdown, heartRateClassifier, stability, targetRange, warmup } =
+    tuning
   positiveInteger(
     heartRateClassifier.plausibleBpm.minimum,
     'plausibleBpm.minimum',
@@ -119,5 +195,6 @@ export function validateGameplayTuning(tuning: GameplayTuning): GameplayTuning {
   )
   positiveInteger(warmup.qualificationMs, 'qualificationMs')
   positiveInteger(countdown.durationMs, 'countdown.durationMs')
+  validateStabilityTuning(stability)
   return tuning
 }

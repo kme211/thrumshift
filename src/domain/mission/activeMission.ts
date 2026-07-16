@@ -11,6 +11,49 @@ import { integrateStability } from './stability'
 export type MissionPlayState = 'active' | 'suspended'
 export type MissionOutcome = 'success' | 'failure'
 
+export type MissionIntervalBehavior =
+  | 'activeBelowRange'
+  | 'activeOperational'
+  | 'activeAboveRange'
+  | 'suspended'
+  | 'unusableSignal'
+  | 'unclassified'
+
+export interface ProcessedMissionInterval {
+  readonly startedAtTimeMs: number
+  readonly endedAtTimeMs: number
+  readonly durationMs: number
+  readonly behavior: MissionIntervalBehavior
+}
+
+export type MissionFactDisposition =
+  'accepted' | 'preemptedByFinalization' | 'ignoredAfterFinalization'
+
+export type MissionClassifierTransition =
+  | {
+      readonly kind: 'established'
+      readonly previous: null
+      readonly current: RangeClassification
+    }
+  | {
+      readonly kind: 'changed'
+      readonly previous: RangeClassification
+      readonly current: RangeClassification
+    }
+  | {
+      readonly kind: 'invalidated'
+      readonly previous: RangeClassification
+      readonly current: null
+    }
+
+export interface ActiveMissionTransition {
+  readonly state: ActiveMissionState
+  readonly interval: ProcessedMissionInterval | null
+  readonly factDisposition: MissionFactDisposition
+  readonly classifierTransition: MissionClassifierTransition | null
+  readonly resultingBehavior: MissionIntervalBehavior
+}
+
 export type MissionStatus =
   | { readonly phase: 'ongoing' }
   | {
@@ -122,12 +165,6 @@ function finalize(
   }
 }
 
-function stabilityBehavior(
-  state: ActiveMissionState,
-): RangeClassification | null {
-  return isEligibleActivePlay(state) ? state.stableClassification : null
-}
-
 function reanchorStability(
   state: ActiveMissionState,
   time: number,
@@ -142,12 +179,64 @@ function reanchorStability(
   }
 }
 
-function isEligibleActivePlay(state: ActiveMissionState): boolean {
-  return (
-    state.playState === 'active' &&
-    state.signalQuality === 'usable' &&
-    state.stableClassification !== null
-  )
+export function getMissionIntervalBehavior(
+  state: ActiveMissionState,
+): MissionIntervalBehavior {
+  if (state.playState === 'suspended') return 'suspended'
+  if (state.signalQuality !== 'usable') return 'unusableSignal'
+  if (state.stableClassification === 'below') return 'activeBelowRange'
+  if (state.stableClassification === 'operational') return 'activeOperational'
+  if (state.stableClassification === 'above') return 'activeAboveRange'
+  return 'unclassified'
+}
+
+function behaviorClassification(
+  behavior: MissionIntervalBehavior,
+): RangeClassification | null {
+  if (behavior === 'activeBelowRange') return 'below'
+  if (behavior === 'activeOperational') return 'operational'
+  if (behavior === 'activeAboveRange') return 'above'
+  return null
+}
+
+function effectiveClassification(
+  state: ActiveMissionState,
+): RangeClassification | null {
+  return state.signalQuality === 'usable' ? state.stableClassification : null
+}
+
+function classifierTransition(
+  before: ActiveMissionState,
+  after: ActiveMissionState,
+  fact: MissionFact,
+): MissionClassifierTransition | null {
+  if (fact.type !== 'classifierUpdated') return null
+  const previous = effectiveClassification(before)
+  const current = effectiveClassification(after)
+  if (previous === current) return null
+  if (previous === null && current !== null) {
+    return { kind: 'established', previous, current }
+  }
+  if (previous !== null && current === null) {
+    return { kind: 'invalidated', previous, current }
+  }
+  if (previous !== null && current !== null) {
+    return { kind: 'changed', previous, current }
+  }
+  return null
+}
+
+function processedInterval(
+  state: ActiveMissionState,
+  endedAtTimeMs: number,
+  behavior: MissionIntervalBehavior,
+): ProcessedMissionInterval {
+  return {
+    startedAtTimeMs: state.lastProcessedTimeMs,
+    endedAtTimeMs,
+    durationMs: endedAtTimeMs - state.lastProcessedTimeMs,
+    behavior,
+  }
 }
 
 function applyFact(
@@ -177,12 +266,20 @@ function applyFact(
  * boundary is finalized, so equal-time sequence order is authoritative.
  * Finalized states ignore every later fact without consulting browser time.
  */
-export function advanceMission(
+export function transitionMission(
   state: ActiveMissionState,
   fact: MissionFact,
   tuning: StabilityTuning,
-): ActiveMissionState {
-  if (state.status.phase === 'finalized') return state
+): ActiveMissionTransition {
+  if (state.status.phase === 'finalized') {
+    return {
+      state,
+      interval: null,
+      factDisposition: 'ignoredAfterFinalization',
+      classifierTransition: null,
+      resultingBehavior: getMissionIntervalBehavior(state),
+    }
+  }
 
   validateStabilityTuning(tuning)
   assertOccurrenceTime(fact.occurrenceTimeMs)
@@ -197,17 +294,15 @@ export function advanceMission(
   }
 
   const elapsedMs = fact.occurrenceTimeMs - state.lastProcessedTimeMs
+  const behavior = getMissionIntervalBehavior(state)
   let advanced: ActiveMissionState = {
     ...state,
     lastProcessedTimeMs: fact.occurrenceTimeMs,
     lastProcessedSequence: fact.sequence,
   }
 
-  if (elapsedMs > 0 && isEligibleActivePlay(state)) {
-    const classification = state.stableClassification
-    if (classification === null) {
-      throw new Error('Eligible active play requires a stable classification')
-    }
+  const classification = behaviorClassification(behavior)
+  if (elapsedMs > 0 && classification !== null) {
     const integration = integrateStability(
       state.stabilitySegmentAnchor.stability,
       classification,
@@ -221,7 +316,7 @@ export function advanceMission(
       if (failureTimeMs < fact.occurrenceTimeMs) {
         const activeElapsedTimeMs =
           state.stabilitySegmentAnchor.activeElapsedTimeMs + failureOffsetMs
-        return finalize(
+        const finalized = finalize(
           {
             ...state,
             activeElapsedTimeMs,
@@ -231,6 +326,13 @@ export function advanceMission(
           failureTimeMs,
           fact.sequence,
         )
+        return {
+          state: finalized,
+          interval: processedInterval(state, failureTimeMs, behavior),
+          factDisposition: 'preemptedByFinalization',
+          classifierTransition: null,
+          resultingBehavior: getMissionIntervalBehavior(finalized),
+        }
       }
     }
     advanced = {
@@ -261,11 +363,34 @@ export function advanceMission(
   }
 
   let applied = applyFact(advanced, fact)
-  if (applied.status.phase === 'finalized') return applied
-  if (stabilityBehavior(applied) !== stabilityBehavior(advanced)) {
+  const acceptedClassifierTransition = classifierTransition(
+    advanced,
+    applied,
+    fact,
+  )
+  if (
+    applied.status.phase !== 'finalized' &&
+    getMissionIntervalBehavior(applied) !== getMissionIntervalBehavior(advanced)
+  ) {
     applied = reanchorStability(applied, fact.occurrenceTimeMs)
   }
-  return applied.stability <= tuning.minimum
-    ? finalize(applied, 'failure', fact.occurrenceTimeMs, fact.sequence)
-    : applied
+  const next =
+    applied.status.phase === 'ongoing' && applied.stability <= tuning.minimum
+      ? finalize(applied, 'failure', fact.occurrenceTimeMs, fact.sequence)
+      : applied
+  return {
+    state: next,
+    interval: processedInterval(state, fact.occurrenceTimeMs, behavior),
+    factDisposition: 'accepted',
+    classifierTransition: acceptedClassifierTransition,
+    resultingBehavior: getMissionIntervalBehavior(next),
+  }
+}
+
+export function advanceMission(
+  state: ActiveMissionState,
+  fact: MissionFact,
+  tuning: StabilityTuning,
+): ActiveMissionState {
+  return transitionMission(state, fact, tuning).state
 }

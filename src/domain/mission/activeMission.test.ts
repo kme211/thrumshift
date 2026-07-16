@@ -7,6 +7,7 @@ import {
 import {
   advanceMission,
   createActiveMissionState,
+  transitionMission,
   type ActiveMissionState,
   type MissionFact,
 } from './activeMission'
@@ -291,6 +292,122 @@ describe('active mission state and stability', () => {
         finalizedAtTimeMs: 5_000,
       },
     })
+  })
+})
+
+describe('authoritative processed intervals', () => {
+  it('reports the same canonical behavior that drives stability and active time', () => {
+    let state = createActiveMissionState(0, tuning)
+    const established = transitionMission(
+      state,
+      classifier(0, 1, 'below'),
+      tuning,
+    )
+    expect(established).toMatchObject({
+      interval: {
+        startedAtTimeMs: 0,
+        endedAtTimeMs: 0,
+        durationMs: 0,
+        behavior: 'unusableSignal',
+      },
+      factDisposition: 'accepted',
+      classifierTransition: {
+        kind: 'established',
+        previous: null,
+        current: 'below',
+      },
+      resultingBehavior: 'activeBelowRange',
+    })
+
+    state = established.state
+    const drained = transitionMission(state, time(1_000.25, 2), tuning)
+    expect(drained.interval).toEqual({
+      startedAtTimeMs: 0,
+      endedAtTimeMs: 1_000.25,
+      durationMs: 1_000.25,
+      behavior: 'activeBelowRange',
+    })
+    expect(drained.state.activeElapsedTimeMs).toBe(1_000.25)
+    expect(drained.state.stability).toBe(97.9995)
+
+    state = drained.state
+    const suspended = transitionMission(
+      state,
+      play(1_500.5, 3, 'suspended'),
+      tuning,
+    )
+    expect(suspended.resultingBehavior).toBe('suspended')
+    state = suspended.state
+    const changedWhileSuspended = transitionMission(
+      state,
+      classifier(2_000.75, 4, 'operational'),
+      tuning,
+    )
+    expect(changedWhileSuspended.interval?.behavior).toBe('suspended')
+    expect(changedWhileSuspended.classifierTransition).toEqual({
+      kind: 'changed',
+      previous: 'below',
+      current: 'operational',
+    })
+    expect(changedWhileSuspended.state.activeElapsedTimeMs).toBe(1_500.5)
+  })
+
+  it('reports preempted and ignored facts without accepting observations', () => {
+    const ongoing = run([classifier(0, 1, 'below')])
+    const preempted = transitionMission(ongoing, time(60_000, 2), tuning)
+    expect(preempted).toMatchObject({
+      interval: {
+        startedAtTimeMs: 0,
+        endedAtTimeMs: 50_000,
+        durationMs: 50_000,
+        behavior: 'activeBelowRange',
+      },
+      factDisposition: 'preemptedByFinalization',
+      classifierTransition: null,
+    })
+    const ignored = transitionMission(
+      preempted.state,
+      puzzle(60_000, 3),
+      tuning,
+    )
+    expect(ignored).toMatchObject({
+      state: preempted.state,
+      interval: null,
+      factDisposition: 'ignoredAfterFinalization',
+    })
+  })
+
+  it('distinguishes unavailable classification from unusable signal', () => {
+    let state = createActiveMissionState(0, tuning)
+    const unclassified = transitionMission(
+      state,
+      classifier(0, 1, null),
+      tuning,
+    )
+    expect(unclassified).toMatchObject({
+      interval: { behavior: 'unusableSignal' },
+      resultingBehavior: 'unclassified',
+    })
+    state = unclassified.state
+    const unclassifiedInterval = transitionMission(
+      state,
+      time(1_000, 2),
+      tuning,
+    )
+    expect(unclassifiedInterval.interval?.behavior).toBe('unclassified')
+    expect(unclassifiedInterval.state.activeElapsedTimeMs).toBe(0)
+
+    state = unclassifiedInterval.state
+    const unusable = transitionMission(
+      state,
+      classifier(2_000, 3, null, 'stale'),
+      tuning,
+    )
+    expect(unusable).toMatchObject({
+      interval: { behavior: 'unclassified' },
+      resultingBehavior: 'unusableSignal',
+    })
+    expect(unusable.state.activeElapsedTimeMs).toBe(0)
   })
 })
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   defaultGameplayTuning,
   validateGameplayTuning,
+  validateMissionStatisticsTuning,
   validateStabilityTuning,
 } from './gameplayTuning'
 
@@ -19,6 +20,14 @@ describe('gameplay tuning', () => {
     ['nonpositive density horizon', { densityWindowMs: 0 }],
     ['unreachable hysteresis exits', { hysteresisBpm: 104 }],
     ['inverted product target limits', { targetRange: { minimumBpm: 220 } }],
+    [
+      'nonpositive statistics sample threshold',
+      { missionStatistics: { minimumValidSampleCount: 0 } },
+    ],
+    [
+      'nonpositive statistics duration threshold',
+      { missionStatistics: { minimumUsableDurationMs: 0 } },
+    ],
   ])('rejects %s', (_name, change) => {
     const tuning: GameplayTuning = {
       ...defaultGameplayTuning,
@@ -46,6 +55,10 @@ describe('gameplay tuning', () => {
         ...defaultGameplayTuning.targetRange,
         ...('targetRange' in change ? change.targetRange : {}),
       },
+      missionStatistics: {
+        ...defaultGameplayTuning.missionStatistics,
+        ...('missionStatistics' in change ? change.missionStatistics : {}),
+      },
     }
     expect(() => validateGameplayTuning(tuning)).toThrow(RangeError)
   })
@@ -55,6 +68,38 @@ describe('gameplay tuning', () => {
       defaultGameplayTuning.stability,
     )
   })
+
+  it('accepts the centralized mission-statistics thresholds', () => {
+    expect(
+      validateMissionStatisticsTuning(defaultGameplayTuning.missionStatistics),
+    ).toBe(defaultGameplayTuning.missionStatistics)
+  })
+
+  it.each(['minimumValidSampleCount', 'minimumUsableDurationMs'] as const)(
+    'rejects runtime mission-statistics tuning missing %s',
+    (missingProperty) => {
+      const runtimeInput = Object.fromEntries(
+        Object.entries(defaultGameplayTuning.missionStatistics).filter(
+          ([name]) => name !== missingProperty,
+        ),
+      )
+      expect(() => validateMissionStatisticsTuning(runtimeInput)).toThrow(
+        RangeError,
+      )
+    },
+  )
+
+  it.each([undefined, '3', Number.NaN, Number.POSITIVE_INFINITY, 1.5, 0, -1])(
+    'rejects invalid mission-statistics threshold %#',
+    (value) => {
+      expect(() =>
+        validateMissionStatisticsTuning({
+          ...defaultGameplayTuning.missionStatistics,
+          minimumValidSampleCount: value,
+        }),
+      ).toThrow(RangeError)
+    },
+  )
 
   const requiredStabilityProperties = [
     'minimum',

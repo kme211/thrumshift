@@ -2,7 +2,7 @@
 
 Stay in range. Keep the station alive.
 
-This repository currently contains the Gate 7A foundation for Thrumshift. In addition to the pre-mission and warm-up flow, it includes one pure, hand-authored coolant-routing puzzle, its isolated accessible workbench, and pure active-mission timeline, station-stability, and ordered outcome rules. It does not include mission-controller or active-screen integration, result metrics/schema, routing, backend, or persistence.
+This repository currently contains the Gate 7B mission-domain foundation for Thrumshift. In addition to the pre-mission and warm-up flow, it includes one pure, hand-authored coolant-routing puzzle, its isolated accessible workbench, and pure active-mission timeline, stability, ordered outcome, statistics, and immutable result-serialization rules. It does not include mission-controller or active-screen integration, result presentation or ratings, routing, backend, or persistence.
 
 ## Requirements
 
@@ -29,6 +29,8 @@ Signal filtering and delivery density use separate horizons. The rolling median 
 The composition root stamps facts with increasing sequence numbers. The warm-up controller applies facts in `(occurrenceTime, sequence)` order, accepts equal-time facts by sequence, and safely ignores and diagnoses late or duplicate facts before they can reach domain transitions.
 
 The active-mission domain uses the same ordering contract without reading browser clocks or scheduling callbacks. Stability rates are station-stability points per eligible active-play second. Eligible time requires active rather than suspended play, usable signal, and an established stable classification; otherwise both active mission time and stability freeze. Between ordered facts the rate is constant, so the engine integrates the entire interval analytically without capping or subdividing it. A failure strictly before a fact preempts that fact. At an exact zero-stability endpoint, the first sequenced fact at that timestamp applies before boundary finalization, allowing puzzle completion to win only when it is ordered first. Once success or failure is finalized, every later mission fact is ignored.
+
+Mission statistics consume facts only through that authoritative transition. Classified, signal-gap, suspension, disconnect, and time-weighted BPM segments use behavior-change anchors, so scheduler cadence does not affect totals. Raw BPM statistics include plausible integer samples received during unsuspended mission play; samples are never inferred across suspension or unusable-signal gaps. Serialized mission results use schema version 1, contain no device identifiers or wall-clock history, and expose insufficient averages or percentages as `null` rather than invented values.
 
 Web Bluetooth requires Android Chrome or another compatible Chromium browser on HTTPS or localhost. The adapter requests only devices advertising the standard Heart Rate Service and subscribes to Heart Rate Measurement notifications. It does not automatically reconnect or remember a device.
 

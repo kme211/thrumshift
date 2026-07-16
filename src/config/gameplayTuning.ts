@@ -41,12 +41,18 @@ export interface StabilityTuning {
   readonly operationalRecoveryPerSecond: number
 }
 
+export interface MissionStatisticsTuning {
+  readonly minimumValidSampleCount: number
+  readonly minimumUsableDurationMs: number
+}
+
 export interface GameplayTuning {
   readonly targetRange: TargetRangeTuning
   readonly heartRateClassifier: HeartRateClassifierTuning
   readonly warmup: WarmupTuning
   readonly countdown: CountdownTuning
   readonly stability: StabilityTuning
+  readonly missionStatistics: MissionStatisticsTuning
 }
 
 export const defaultGameplayTuning: GameplayTuning = {
@@ -75,6 +81,10 @@ export const defaultGameplayTuning: GameplayTuning = {
     belowDrainPerSecond: 2,
     aboveDrainPerSecond: 3,
     operationalRecoveryPerSecond: 1,
+  },
+  missionStatistics: {
+    minimumValidSampleCount: 3,
+    minimumUsableDurationMs: 4_000,
   },
 }
 
@@ -136,10 +146,41 @@ export function validateStabilityTuning(tuning: unknown): StabilityTuning {
   return runtimeTuning as unknown as StabilityTuning
 }
 
+export function validateMissionStatisticsTuning(
+  tuning: unknown,
+): MissionStatisticsTuning {
+  if (typeof tuning !== 'object' || tuning === null) {
+    throw new RangeError('missionStatistics tuning must be an object')
+  }
+  const runtimeTuning = tuning as Record<PropertyKey, unknown>
+  const properties = [
+    'minimumValidSampleCount',
+    'minimumUsableDurationMs',
+  ] as const
+  for (const name of properties) {
+    if (!Object.hasOwn(runtimeTuning, name)) {
+      throw new RangeError(`missionStatistics.${name} is required`)
+    }
+    const value = runtimeTuning[name]
+    if (!Number.isSafeInteger(value) || (value as number) <= 0) {
+      throw new RangeError(
+        `missionStatistics.${name} must be a positive safe integer`,
+      )
+    }
+  }
+  return runtimeTuning as unknown as MissionStatisticsTuning
+}
+
 /** Validates configuration once at the composition boundary, never in a timer. */
 export function validateGameplayTuning(tuning: GameplayTuning): GameplayTuning {
-  const { countdown, heartRateClassifier, stability, targetRange, warmup } =
-    tuning
+  const {
+    countdown,
+    heartRateClassifier,
+    missionStatistics,
+    stability,
+    targetRange,
+    warmup,
+  } = tuning
   positiveInteger(
     heartRateClassifier.plausibleBpm.minimum,
     'plausibleBpm.minimum',
@@ -195,6 +236,7 @@ export function validateGameplayTuning(tuning: GameplayTuning): GameplayTuning {
   )
   positiveInteger(warmup.qualificationMs, 'qualificationMs')
   positiveInteger(countdown.durationMs, 'countdown.durationMs')
+  validateMissionStatisticsTuning(missionStatistics)
   validateStabilityTuning(stability)
   return tuning
 }

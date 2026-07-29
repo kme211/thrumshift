@@ -5,7 +5,7 @@ import {
   getCountdownRemainingMs,
   getWarmupProgressMs,
 } from '../domain/mission/warmup'
-import type { WarmupSession } from '../app/WarmupFlowController'
+import type { WarmupSession } from '../app/WarmupSession'
 import type { TelemetrySourceStatus } from '../telemetry/HeartRateTelemetrySource'
 import { TargetRangeFields } from './TargetRangeFields'
 

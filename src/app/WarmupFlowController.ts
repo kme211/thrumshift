@@ -1,13 +1,9 @@
 import { defaultGameplayTuning } from '../config/gameplayTuning'
 import {
-  createClassifierState,
   transitionClassifier,
   validateTargetRange,
 } from '../domain/heart-rate/classifier'
 import type {
-  ClassifierFact,
-  ClassifierInvalidationReason,
-  ClassifierState,
   ClassifierTransition,
   TargetRange,
 } from '../domain/heart-rate/classifier'
@@ -23,7 +19,6 @@ import {
   selectPuzzleHint,
 } from '../domain/puzzle/model'
 import { createWarmupState, transitionWarmup } from '../domain/mission/warmup'
-import type { WarmupFact, WarmupState } from '../domain/mission/warmup'
 import type { TelemetrySourceStatus } from '../telemetry/HeartRateTelemetrySource'
 import type { AppState } from './AppState'
 import { appReducer } from './appReducer'
@@ -32,14 +27,14 @@ import { createMissionRun } from './MissionRun'
 import type { MissionRun } from './MissionRun'
 import { appendFlowDiagnostics } from './FlowDiagnostics'
 import type { WarmupTelemetryDiagnosticEntry } from './FlowDiagnostics'
+import {
+  advanceWarmupSession,
+  createWarmupSession,
+  invalidateWarmupSession,
+} from './WarmupSession'
+import type { WarmupSession } from './WarmupSession'
 
 export type { WarmupTelemetryDiagnosticEntry } from './FlowDiagnostics'
-
-export interface WarmupSession {
-  readonly targetRange: TargetRange
-  readonly classifier: ClassifierState
-  readonly warmup: WarmupState
-}
 
 export type WarmupFlowLifecycle = AppState<
   WarmupSession,
@@ -134,63 +129,6 @@ export function createWarmupFlowState(
     lastAppliedOccurrenceTimeMs: null,
     lastAppliedSequence: 0,
   }
-}
-
-export function createWarmupSession(
-  occurredAt: number,
-  targetRange: TargetRange,
-): WarmupSession {
-  validateTargetRange(targetRange, tuning.heartRateClassifier)
-  return {
-    targetRange,
-    classifier: createClassifierState(occurredAt),
-    warmup: createWarmupState(occurredAt),
-  }
-}
-
-function transitionSession(
-  session: WarmupSession,
-  classifierFact: ClassifierFact,
-  warmupFact?: WarmupFact,
-): WarmupSession {
-  const classifier = transitionClassifier(
-    session.classifier,
-    classifierFact,
-    session.targetRange,
-    tuning.heartRateClassifier,
-  ).state
-  const fact: WarmupFact = warmupFact ?? {
-    type: 'classifierUpdated',
-    occurrenceTimeMs: classifierFact.occurrenceTimeMs,
-    signalQuality: classifier.signalQuality,
-    stableClassification: classifier.stableClassification,
-  }
-  return {
-    ...session,
-    classifier,
-    warmup: transitionWarmup(
-      session.warmup,
-      fact,
-      tuning.warmup,
-      tuning.countdown,
-    ),
-  }
-}
-
-function invalidateSession(
-  session: WarmupSession,
-  occurredAt: number,
-  reason: Exclude<
-    ClassifierInvalidationReason,
-    'staleSignal' | 'invalidSample'
-  >,
-  warmupReason: Extract<WarmupFact, { type: 'invalidate' }>['reason'],
-): WarmupSession {
-  return transitionSession(
-    session,
-    { type: 'invalidate', occurrenceTimeMs: occurredAt, reason },
-    { type: 'invalidate', occurrenceTimeMs: occurredAt, reason: warmupReason },
-  )
 }
 
 function liveSession(lifecycle: WarmupFlowLifecycle): WarmupSession | null {
@@ -528,11 +466,12 @@ function reduceWarmupFlow(
     let lifecycle = state.lifecycle
     const session = liveSession(lifecycle)
     if (session !== null) {
-      const invalidated = invalidateSession(
+      const invalidated = invalidateWarmupSession(
         { ...session, targetRange: validated.range },
         fact.occurredAt,
         'targetRangeChanged',
         'targetRangeChanged',
+        tuning,
       )
       lifecycle = applySession(lifecycle, invalidated)
     }
@@ -562,7 +501,11 @@ function reduceWarmupFlow(
     )
       return state
     const runGeneration = state.runGeneration + 1
-    const session = createWarmupSession(fact.occurredAt, state.targetRange)
+    const session = createWarmupSession(
+      fact.occurredAt,
+      state.targetRange,
+      tuning,
+    )
     return {
       ...state,
       runGeneration,
@@ -792,11 +735,12 @@ function reduceWarmupFlow(
         fact.status.state === 'disconnected' ||
         (fact.status.state === 'error' &&
           fact.status.error.code === 'device-disconnected')
-      const invalidated = invalidateSession(
+      const invalidated = invalidateWarmupSession(
         session,
         fact.occurredAt,
         disconnected ? 'disconnect' : 'invalidSignal',
         disconnected ? 'disconnect' : 'invalidSignal',
+        tuning,
       )
       lifecycle = applySession(lifecycle, invalidated)
       if (disconnected) {
@@ -833,7 +777,11 @@ function reduceWarmupFlow(
         lifecycle = appReducer(lifecycle, {
           type: 'warmupRecovered',
           runId,
-          warmup: createWarmupSession(fact.occurredAt, state.targetRange),
+          warmup: createWarmupSession(
+            fact.occurredAt,
+            state.targetRange,
+            tuning,
+          ),
         })
       }
     }
@@ -898,11 +846,15 @@ function reduceWarmupFlow(
     const session = liveSession(state.lifecycle)
     if (session === null)
       return valid ? { ...state, latestPreMissionBpm: bpm } : state
-    const nextSession = transitionSession(session, {
-      type: 'sample',
-      occurrenceTimeMs,
-      bpm,
-    })
+    const nextSession = advanceWarmupSession(
+      session,
+      {
+        type: 'sample',
+        occurrenceTimeMs,
+        bpm,
+      },
+      tuning,
+    )
     return {
       ...state,
       lifecycle: recoverFromStaleSignal(
@@ -930,7 +882,13 @@ function reduceWarmupFlow(
     if (fact.state === 'hidden') {
       lifecycle = applySession(
         lifecycle,
-        invalidateSession(session, fact.occurredAt, 'hidden', 'hidden'),
+        invalidateWarmupSession(
+          session,
+          fact.occurredAt,
+          'hidden',
+          'hidden',
+          tuning,
+        ),
       )
       lifecycle = appReducer(lifecycle, {
         type: 'suspended',
@@ -954,7 +912,11 @@ function reduceWarmupFlow(
         lifecycle = appReducer(lifecycle, {
           type: 'warmupRecovered',
           runId,
-          warmup: createWarmupSession(fact.occurredAt, state.targetRange),
+          warmup: createWarmupSession(
+            fact.occurredAt,
+            state.targetRange,
+            tuning,
+          ),
         })
     }
     return {
@@ -989,10 +951,14 @@ function reduceWarmupFlow(
   }
   const session = liveSession(state.lifecycle)
   if (session === null) return state
-  const nextSession = transitionSession(session, {
-    type: 'timeAdvanced',
-    occurrenceTimeMs: fact.occurredAt,
-  })
+  const nextSession = advanceWarmupSession(
+    session,
+    {
+      type: 'timeAdvanced',
+      occurrenceTimeMs: fact.occurredAt,
+    },
+    tuning,
+  )
   let lifecycle = applySession(state.lifecycle, nextSession, fact.sequence)
   const becameStale =
     nextSession.classifier.signalQuality === 'stale' &&

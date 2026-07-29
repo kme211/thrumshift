@@ -4,12 +4,9 @@ import type {
 } from '../domain/heart-rate/classifier'
 import { isValidHeartRateBpm } from '../domain/heart-rate/range'
 import { getWarmupProgressMs } from '../domain/mission/warmup'
-import type {
-  WarmupFlowFact,
-  WarmupFlowState,
-  WarmupSession,
-} from './WarmupFlowController'
+import type { WarmupFlowFact, WarmupFlowState } from './WarmupFlowController'
 import type { MissionRun } from './MissionRun'
+import type { WarmupSession } from './WarmupSession'
 
 export interface WarmupTelemetryDiagnosticEntry {
   readonly sequence: number

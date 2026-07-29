@@ -1,14 +1,18 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { createWarmupSession } from '../app/WarmupFlowController'
+import { createWarmupSession } from '../app/WarmupSession'
 import { transitionClassifier } from '../domain/heart-rate/classifier'
 import { transitionWarmup } from '../domain/mission/warmup'
 import { defaultGameplayTuning } from '../config/gameplayTuning'
 import { WarmupScreen } from './WarmupScreen'
 
 function renderSession(
-  session = createWarmupSession(0, { lowerBpm: 100, upperBpm: 140 }),
+  session = createWarmupSession(
+    0,
+    { lowerBpm: 100, upperBpm: 140 },
+    defaultGameplayTuning,
+  ),
 ) {
   render(
     <WarmupScreen
@@ -37,7 +41,11 @@ describe('WarmupScreen', () => {
   })
 
   it('renders domain countdown state without calculating qualification', () => {
-    let session = createWarmupSession(0, { lowerBpm: 100, upperBpm: 140 })
+    let session = createWarmupSession(
+      0,
+      { lowerBpm: 100, upperBpm: 140 },
+      defaultGameplayTuning,
+    )
     let classifier = session.classifier
     for (const time of [0, 500, 1_000, 2_000, 3_000]) {
       classifier = transitionClassifier(
@@ -73,10 +81,14 @@ describe('WarmupScreen', () => {
   })
 
   it('renders consecutive progress supplied by the domain warm-up state', () => {
-    let session = createWarmupSession(0, {
-      lowerBpm: 100,
-      upperBpm: 140,
-    })
+    let session = createWarmupSession(
+      0,
+      {
+        lowerBpm: 100,
+        upperBpm: 140,
+      },
+      defaultGameplayTuning,
+    )
     let warmup = transitionWarmup(
       session.warmup,
       {

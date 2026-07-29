@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 import type { AppState } from '../app/AppState'
-import type { WarmupSession } from '../app/WarmupFlowController'
+import type { WarmupSession } from '../app/WarmupSession'
 
 type ShellAppState = AppState<
   WarmupSession,

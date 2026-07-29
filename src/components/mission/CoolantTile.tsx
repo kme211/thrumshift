@@ -36,6 +36,7 @@ export function CoolantTile({
   sourceConnected,
   hinted,
   rotationCount,
+  disabled = false,
   onRotate,
 }: {
   readonly tile: PuzzleTile
@@ -43,6 +44,7 @@ export function CoolantTile({
   readonly sourceConnected: boolean
   readonly hinted: boolean
   readonly rotationCount: number
+  readonly disabled?: boolean
   readonly onRotate: () => void
 }) {
   const accessibleName = coolantTileName(tile, openings, sourceConnected)
@@ -54,6 +56,7 @@ export function CoolantTile({
       aria-describedby={hinted ? 'coolant-hint-status' : undefined}
       data-receiving-coolant={sourceConnected || undefined}
       data-hinted={hinted || undefined}
+      disabled={disabled}
       onClick={onRotate}
     >
       <svg

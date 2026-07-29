@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 
-import { CoolantPuzzle } from '../components/mission/CoolantPuzzle'
 import {
   SIMULATED_HR6_CADENCE_MS,
   type ContinuousEmissionState,
@@ -28,6 +27,15 @@ export function DevelopmentDiagnostics({
     [simulatedSource],
   )
   const diagnosticLog = state.diagnosticLog
+  const activeRun =
+    state.lifecycle.phase === 'activeMission'
+      ? state.lifecycle.mission
+      : state.lifecycle.phase === 'suspended' &&
+          state.lifecycle.resumeTarget.phase === 'activeMission'
+        ? state.lifecycle.resumeTarget.mission
+        : null
+  const finalizedResult =
+    state.lifecycle.phase === 'result' ? state.lifecycle.result : null
   return (
     <aside
       className="development-diagnostics mx-auto mt-6 max-w-3xl border border-dashed border-[var(--color-border)]"
@@ -46,6 +54,40 @@ export function DevelopmentDiagnostics({
       <p className="mt-2 text-sm">
         Diagnostic events captured: {diagnosticLog.length}
       </p>
+      {activeRun === null && finalizedResult === null ? null : (
+        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+          <dt>Active play</dt>
+          <dd>
+            {Math.round(
+              (activeRun?.session.mission.activeElapsedTimeMs ??
+                finalizedResult?.activeDurationMs ??
+                0) / 1_000,
+            )}{' '}
+            seconds
+          </dd>
+          <dt>Puzzle moves</dt>
+          <dd>
+            {activeRun?.session.statistics.puzzleMoveCount ??
+              finalizedResult?.puzzleMoveCount}
+          </dd>
+          <dt>Hint used</dt>
+          <dd>
+            {(activeRun?.session.statistics.hintUsed ??
+            finalizedResult?.hintUsed)
+              ? 'yes'
+              : 'no'}
+          </dd>
+          <dt>Station stability</dt>
+          <dd>
+            {Math.round(
+              activeRun?.session.mission.stability ??
+                finalizedResult?.endingStability ??
+                0,
+            )}
+            %
+          </dd>
+        </dl>
+      )}
       <label className="mt-3 block">
         <span className="block text-sm">Simulated BPM</span>
         <input
@@ -135,9 +177,6 @@ export function DevelopmentDiagnostics({
         >
           Reset diagnostic log
         </button>
-      </div>
-      <div className="mt-6 border-t border-[var(--color-border)] pt-6">
-        <CoolantPuzzle />
       </div>
     </aside>
   )

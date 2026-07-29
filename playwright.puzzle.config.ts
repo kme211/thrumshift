@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: 'puzzle-workbench.spec.ts',
+  testMatch: 'active-mission.spec.ts',
   fullyParallel: true,
   reporter: 'html',
   use: {

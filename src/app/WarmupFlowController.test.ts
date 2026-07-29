@@ -60,6 +60,26 @@ function sustainedOperationalSamples(endTime: number): WarmupFlowFactPayload[] {
   return facts
 }
 
+function enterActiveMission(): WarmupFlowState {
+  return run([
+    connected(),
+    begin(),
+    ...sustainedOperationalSamples(13_000),
+    advance(16_000),
+  ])
+}
+
+function activeMissionWithFreshSamples(
+  bpm: number,
+  endTime = 22_000,
+): WarmupFlowState {
+  let state = enterActiveMission()
+  for (let time = 17_000; time <= endTime; time += 1_000) {
+    state = apply(state, sample(time, bpm))
+  }
+  return state
+}
+
 describe('warm-up flow controller', () => {
   it('records sanitized events with relative monotonic time and sequence order', () => {
     let state = createWarmupFlowState(true)
@@ -240,6 +260,570 @@ describe('warm-up flow controller', () => {
       advance(20_000),
     ])
     expect(cancelled.lifecycle.phase).toBe('suspended')
+  })
+
+  it('creates one canonical active run and advances mission, statistics, classifier, and puzzle together', () => {
+    let state = run([
+      connected(),
+      begin(),
+      ...sustainedOperationalSamples(13_000),
+      advance(16_000),
+    ])
+    expect(state.lifecycle.phase).toBe('activeMission')
+    if (state.lifecycle.phase !== 'activeMission') return
+    const originalRun = state.lifecycle.mission
+    expect(originalRun.session.mission.stableClassification).toBe(
+      originalRun.classifier.stableClassification,
+    )
+
+    state = apply(state, {
+      type: 'puzzleTileRotated',
+      occurredAt: 16_100,
+      tileId: 'top-straight',
+    })
+    expect(state.lifecycle.phase).toBe('activeMission')
+    if (state.lifecycle.phase !== 'activeMission') return
+    expect(state.lifecycle.mission).not.toBe(originalRun)
+    expect(state.lifecycle.mission.session.statistics.puzzleMoveCount).toBe(1)
+    expect(state.lifecycle.mission.puzzle.orientations['top-straight']).toBe(1)
+  })
+
+  it('freezes canonical active time and puzzle input during manual pause, then resumes retained state', () => {
+    let state = run([
+      connected(),
+      begin(),
+      ...sustainedOperationalSamples(13_000),
+      advance(16_000),
+    ])
+    state = apply(state, { type: 'manualPause', occurredAt: 17_000 })
+    expect(state.lifecycle.phase).toBe('suspended')
+    if (
+      state.lifecycle.phase !== 'suspended' ||
+      state.lifecycle.resumeTarget.phase !== 'activeMission'
+    )
+      return
+    const pausedRun = state.lifecycle.resumeTarget.mission
+    const pausedElapsed = pausedRun.session.mission.activeElapsedTimeMs
+    const orientation = pausedRun.puzzle.orientations['top-straight']
+
+    state = apply(state, {
+      type: 'puzzleTileRotated',
+      occurredAt: 25_000,
+      tileId: 'top-straight',
+    })
+    state = apply(state, {
+      type: 'timeAdvanced',
+      occurredAt: 25_500,
+      runGeneration: 1,
+    })
+    if (
+      state.lifecycle.phase !== 'suspended' ||
+      state.lifecycle.resumeTarget.phase !== 'activeMission'
+    )
+      return
+    expect(
+      state.lifecycle.resumeTarget.mission.puzzle.orientations['top-straight'],
+    ).toBe(orientation)
+    expect(
+      state.lifecycle.resumeTarget.mission.session.mission.activeElapsedTimeMs,
+    ).toBe(pausedElapsed)
+
+    state = apply(state, { type: 'manualResume', occurredAt: 26_000 })
+    expect(state.lifecycle.phase).toBe('activeMission')
+    if (state.lifecycle.phase !== 'activeMission') return
+    expect(state.lifecycle.mission.session.mission.activeElapsedTimeMs).toBe(
+      pausedElapsed,
+    )
+    expect(state.lifecycle.mission.session.statistics.pauseCount).toBe(1)
+  })
+
+  it('keeps reset metrics cumulative and finalizes success only through ordered puzzle completion', () => {
+    let state = run([
+      connected(),
+      begin(),
+      ...sustainedOperationalSamples(13_000),
+      advance(16_000),
+    ])
+    state = apply(state, {
+      type: 'puzzleTileRotated',
+      occurredAt: 16_100,
+      tileId: 'top-straight',
+    })
+    state = apply(state, { type: 'puzzleReset', occurredAt: 16_200 })
+    state = apply(state, {
+      type: 'puzzleTileRotated',
+      occurredAt: 16_300,
+      tileId: 'top-straight',
+    })
+    state = apply(state, {
+      type: 'puzzleTileRotated',
+      occurredAt: 16_400,
+      tileId: 'middle-corner-left',
+    })
+    state = apply(state, {
+      type: 'puzzleTileRotated',
+      occurredAt: 16_500,
+      tileId: 'bottom-straight',
+    })
+
+    expect(state.lifecycle.phase).toBe('result')
+    if (state.lifecycle.phase !== 'result') return
+    expect(state.lifecycle.result).toMatchObject({
+      outcome: 'success',
+      puzzleMoveCount: 4,
+      puzzleCompleted: true,
+    })
+    const finalized = state.lifecycle
+    state = apply(state, {
+      type: 'timeAdvanced',
+      occurredAt: 50_000,
+      runGeneration: 1,
+    })
+    expect(state.lifecycle).toBe(finalized)
+  })
+
+  it('lets authoritative failure preempt later puzzle input without changing puzzle statistics', () => {
+    let state = enterActiveMission()
+    for (let time = 17_000; time <= 54_000; time += 1_000) {
+      state = apply(state, sample(time, 170))
+    }
+    expect(state.lifecycle.phase).toBe('activeMission')
+    if (state.lifecycle.phase !== 'activeMission') return
+    expect(state.lifecycle.mission.classifier.stableClassification).toBe(
+      'above',
+    )
+    expect(state.lifecycle.mission.session.mission.stability).toBe(1)
+    state = apply(state, {
+      type: 'puzzleTileRotated',
+      occurredAt: 55_000,
+      tileId: 'top-straight',
+    })
+    expect(state.lifecycle.phase).toBe('result')
+    if (state.lifecycle.phase !== 'result') return
+    expect(state.lifecycle.result.outcome).toBe('failure')
+    expect(state.lifecycle.result.endingStability).toBe(0)
+    expect(state.lifecycle.result.puzzleMoveCount).toBe(0)
+    const result = state.lifecycle.result
+    state = apply(state, {
+      type: 'puzzleTileRotated',
+      occurredAt: 81_000,
+      tileId: 'top-straight',
+    })
+    if (state.lifecycle.phase === 'result')
+      expect(state.lifecycle.result).toBe(result)
+  })
+
+  it('announces a decreasing trend once without changing the announcement on each stability tick or frozen wake', () => {
+    let state = activeMissionWithFreshSamples(170)
+    expect(state.lifecycle.phase).toBe('activeMission')
+    expect(state.announcement).toBe(
+      'Heart rate is above range. Station stability is decreasing',
+    )
+    const decreasingAnnouncement = state.announcement
+
+    state = apply(state, sample(23_000, 170))
+    state = apply(state, sample(24_000, 170))
+    expect(state.lifecycle.phase).toBe('activeMission')
+    expect(state.announcement).toBe(decreasingAnnouncement)
+
+    state = apply(state, { type: 'manualPause', occurredAt: 24_500 })
+    expect(state.announcement).toBe('Mission paused')
+    state = apply(state, advance(25_000))
+    expect(state.announcement).toBe('Mission paused')
+  })
+
+  it('announces recovering and holding once when those stability trends begin', () => {
+    let state = activeMissionWithFreshSamples(170)
+    for (let time = 23_000; time <= 27_000; time += 1_000) {
+      state = apply(state, sample(time, 110))
+    }
+    expect(state.lifecycle.phase).toBe('activeMission')
+    expect(state.announcement).toBe(
+      'Heart rate is operational. Station stability is recovering',
+    )
+    const recoveringAnnouncement = state.announcement
+
+    state = apply(state, sample(28_000, 110))
+    expect(state.announcement).toBe(recoveringAnnouncement)
+
+    for (let time = 29_000; time <= 46_000; time += 1_000) {
+      state = apply(state, sample(time, 110))
+    }
+    expect(state.lifecycle.phase).toBe('activeMission')
+    expect(state.announcement).toBe('Station stability is holding')
+    const holdingAnnouncement = state.announcement
+    state = apply(state, sample(47_000, 110))
+    expect(state.announcement).toBe(holdingAnnouncement)
+  })
+
+  it('announces each established stability threshold once and leaves failure to the focused result transition', () => {
+    let state = enterActiveMission()
+    let previousAnnouncement = state.announcement
+    const announcements: string[] = []
+
+    for (let time = 17_000; time <= 55_000; time += 1_000) {
+      state = apply(state, sample(time, 170))
+      if (state.announcement !== previousAnnouncement) {
+        announcements.push(state.announcement)
+        previousAnnouncement = state.announcement
+      }
+    }
+
+    expect(announcements).toEqual([
+      'Heart rate is above range. Station stability is decreasing',
+      'Station stability warning: 75 percent',
+      'Station stability critical: 50 percent',
+      'Station stability critical: 25 percent',
+    ])
+    expect(state.lifecycle.phase).toBe('result')
+    if (state.lifecycle.phase === 'result') {
+      expect(state.lifecycle.result.outcome).toBe('failure')
+    }
+  })
+
+  it('advances signal authority before a rotation and freezes timing and stability at the exact stale deadline', () => {
+    let state = activeMissionWithFreshSamples(170)
+    state = apply(state, {
+      type: 'puzzleTileRotated',
+      occurredAt: 26_000,
+      tileId: 'top-straight',
+    })
+
+    expect(state.lifecycle.phase).toBe('activeMission')
+    if (state.lifecycle.phase !== 'activeMission') return
+    const run = state.lifecycle.mission
+    expect(run.classifier.signalQuality).toBe('stale')
+    expect(run.session.mission).toMatchObject({
+      lastProcessedTimeMs: 26_000,
+      activeElapsedTimeMs: 4_000,
+      stability: 88,
+      signalQuality: 'stale',
+      stableClassification: null,
+    })
+    expect(run.session.statistics.completedDurationsMs.aboveRange).toBe(4_000)
+    expect(run.session.statistics.durationSegment).toEqual({
+      behavior: 'unusableSignal',
+      startedAtTimeMs: 25_000,
+    })
+    expect(run.session.statistics.puzzleMoveCount).toBe(1)
+  })
+
+  it('orders stale authority before equal-time puzzle facts', () => {
+    let state = activeMissionWithFreshSamples(170)
+    state = apply(state, {
+      type: 'puzzleTileRotated',
+      occurredAt: 25_000,
+      tileId: 'top-straight',
+    })
+
+    expect(state.lifecycle.phase).toBe('activeMission')
+    if (state.lifecycle.phase !== 'activeMission') return
+    const run = state.lifecycle.mission
+    expect(run.session.mission).toMatchObject({
+      lastProcessedTimeMs: 25_000,
+      activeElapsedTimeMs: 4_000,
+      stability: 88,
+      signalQuality: 'stale',
+    })
+    expect(run.session.statistics.durationSegment).toEqual({
+      behavior: 'unusableSignal',
+      startedAtTimeMs: 25_000,
+    })
+    expect(run.session.statistics.puzzleMoveCount).toBe(1)
+  })
+
+  it('cannot complete the puzzle ahead of an earlier unusable transition', () => {
+    let state = activeMissionWithFreshSamples(170)
+    for (const [occurredAt, tileId] of [
+      [26_000, 'top-straight'],
+      [27_000, 'middle-corner-left'],
+      [28_000, 'bottom-straight'],
+    ] as const) {
+      state = apply(state, {
+        type: 'puzzleTileRotated',
+        occurredAt,
+        tileId,
+      })
+    }
+
+    expect(state.lifecycle.phase).toBe('result')
+    if (state.lifecycle.phase !== 'result') return
+    expect(state.lifecycle.result).toMatchObject({
+      outcome: 'success',
+      activeDurationMs: 4_000,
+      aboveRangeDurationMs: 4_000,
+      unusableSignalDurationMs: 6_000,
+      puzzleMoveCount: 3,
+      puzzleCompleted: true,
+      endingStability: 88,
+    })
+  })
+
+  it('orders a hint request after stale authority while retaining Gate 8A interaction policy', () => {
+    let state = activeMissionWithFreshSamples(110, 30_000)
+    const priorGlobalAnnouncement = state.announcement
+    state = apply(state, {
+      type: 'puzzleHintRequested',
+      occurredAt: 34_000,
+    })
+
+    expect(state.lifecycle.phase).toBe('activeMission')
+    if (state.lifecycle.phase !== 'activeMission') return
+    const run = state.lifecycle.mission
+    expect(run.classifier.signalQuality).toBe('stale')
+    expect(run.session.mission.activeElapsedTimeMs).toBe(12_000)
+    expect(run.session.statistics.completedDurationsMs.operational).toBe(12_000)
+    expect(run.session.statistics.durationSegment).toEqual({
+      behavior: 'unusableSignal',
+      startedAtTimeMs: 33_000,
+    })
+    expect(run.session.statistics.hintUsed).toBe(true)
+    expect(run.hint).not.toBeNull()
+    expect(state.announcement).toBe(priorGlobalAnnouncement)
+  })
+
+  it('advances stale authority before reset and pause facts', () => {
+    let resetState = activeMissionWithFreshSamples(170)
+    resetState = apply(resetState, {
+      type: 'puzzleReset',
+      occurredAt: 26_000,
+    })
+    expect(resetState.lifecycle.phase).toBe('activeMission')
+    if (resetState.lifecycle.phase === 'activeMission') {
+      expect(resetState.lifecycle.mission.classifier.signalQuality).toBe(
+        'stale',
+      )
+      expect(
+        resetState.lifecycle.mission.session.statistics.durationSegment,
+      ).toEqual({
+        behavior: 'unusableSignal',
+        startedAtTimeMs: 25_000,
+      })
+    }
+
+    let pausedState = activeMissionWithFreshSamples(170)
+    pausedState = apply(pausedState, {
+      type: 'manualPause',
+      occurredAt: 26_000,
+    })
+    expect(pausedState.lifecycle.phase).toBe('suspended')
+    if (
+      pausedState.lifecycle.phase !== 'suspended' ||
+      pausedState.lifecycle.resumeTarget.phase !== 'activeMission'
+    )
+      return
+    const run = pausedState.lifecycle.resumeTarget.mission
+    expect(run.classifier).toMatchObject({
+      signalQuality: 'insufficient',
+      stableClassification: null,
+      lastInvalidationReason: 'manualSuspension',
+    })
+    expect(run.session.mission).toMatchObject({
+      activeElapsedTimeMs: 4_000,
+      stability: 88,
+      playState: 'suspended',
+    })
+    expect(run.session.statistics.completedDurationsMs).toMatchObject({
+      aboveRange: 4_000,
+      unusableSignal: 4_000,
+    })
+  })
+
+  it('produces equivalent mission and statistics state for prompt and delayed scheduler scripts', () => {
+    let prompt = activeMissionWithFreshSamples(170)
+    prompt = apply(prompt, advance(25_000))
+    prompt = apply(prompt, advance(26_000))
+
+    let delayed = activeMissionWithFreshSamples(170)
+    delayed = apply(delayed, advance(26_000))
+
+    expect(prompt.lifecycle.phase).toBe('activeMission')
+    expect(delayed.lifecycle.phase).toBe('activeMission')
+    if (
+      prompt.lifecycle.phase !== 'activeMission' ||
+      delayed.lifecycle.phase !== 'activeMission'
+    )
+      return
+    const promptMission = {
+      ...prompt.lifecycle.mission.session.mission,
+      lastProcessedSequence: 0,
+    }
+    const delayedMission = {
+      ...delayed.lifecycle.mission.session.mission,
+      lastProcessedSequence: 0,
+    }
+    expect(promptMission).toEqual(delayedMission)
+    expect(prompt.lifecycle.mission.session.statistics).toEqual(
+      delayed.lifecycle.mission.session.statistics,
+    )
+  })
+
+  it('invalidates manual pause classification and requires fresh density and dwell after resume', () => {
+    let state = activeMissionWithFreshSamples(110, 24_000)
+    expect(state.lifecycle.phase).toBe('activeMission')
+    if (state.lifecycle.phase !== 'activeMission') return
+    expect(state.lifecycle.mission.classifier.stableClassification).toBe(
+      'operational',
+    )
+
+    state = apply(state, { type: 'manualPause', occurredAt: 25_000 })
+    expect(state.lifecycle.phase).toBe('suspended')
+    if (
+      state.lifecycle.phase !== 'suspended' ||
+      state.lifecycle.resumeTarget.phase !== 'activeMission'
+    )
+      return
+    const retainedPuzzle = state.lifecycle.resumeTarget.mission.puzzle
+    const retainedStatistics =
+      state.lifecycle.resumeTarget.mission.session.statistics
+    const pausedElapsed =
+      state.lifecycle.resumeTarget.mission.session.mission.activeElapsedTimeMs
+    expect(state.lifecycle.resumeTarget.mission.classifier).toMatchObject({
+      latestValidBpm: 110,
+      signalQuality: 'insufficient',
+      stableClassification: null,
+      candidateClassification: null,
+      filterSamples: [],
+      validSampleTimesMs: [],
+      lastInvalidationReason: 'manualSuspension',
+    })
+
+    state = apply(state, { type: 'manualResume', occurredAt: 30_000 })
+    if (state.lifecycle.phase !== 'activeMission') return
+    const resumedRun = state.lifecycle.mission
+    state = apply(state, {
+      type: 'timeAdvanced',
+      occurredAt: 30_500,
+      runGeneration: 0,
+    })
+    expect(state.lifecycle.phase).toBe('activeMission')
+    if (state.lifecycle.phase !== 'activeMission') return
+    expect(state.lifecycle.mission).toBe(resumedRun)
+    state = apply(state, advance(31_000))
+    expect(state.lifecycle.phase).toBe('activeMission')
+    if (state.lifecycle.phase !== 'activeMission') return
+    expect(state.lifecycle.mission.classifier.stableClassification).toBeNull()
+    expect(state.lifecycle.mission.session.mission.activeElapsedTimeMs).toBe(
+      pausedElapsed,
+    )
+    expect(state.lifecycle.mission.session.mission.stability).toBe(100)
+    expect(state.lifecycle.mission.puzzle).toBe(retainedPuzzle)
+    expect(state.lifecycle.mission.session.statistics).toMatchObject({
+      puzzleMoveCount: retainedStatistics.puzzleMoveCount,
+      hintUsed: retainedStatistics.hintUsed,
+      pauseCount: 1,
+    })
+
+    for (const time of [32_000, 33_000, 34_000, 35_000]) {
+      state = apply(state, sample(time, 110))
+    }
+    if (state.lifecycle.phase !== 'activeMission') return
+    expect(state.lifecycle.mission.classifier.stableClassification).toBeNull()
+    expect(state.lifecycle.mission.session.mission.activeElapsedTimeMs).toBe(
+      pausedElapsed,
+    )
+
+    state = apply(state, sample(36_000, 110))
+    expect(state.lifecycle.phase).toBe('activeMission')
+    if (state.lifecycle.phase !== 'activeMission') return
+    expect(state.lifecycle.mission.classifier.stableClassification).toBe(
+      'operational',
+    )
+    expect(state.lifecycle.mission.session.mission.activeElapsedTimeMs).toBe(
+      pausedElapsed,
+    )
+    state = apply(state, advance(37_000))
+    if (state.lifecycle.phase === 'activeMission') {
+      expect(state.lifecycle.mission.session.mission.activeElapsedTimeMs).toBe(
+        pausedElapsed + 1_000,
+      )
+    }
+  })
+
+  it.each([
+    ['below', 80],
+    ['above', 170],
+  ] as const)(
+    'does not reuse a pre-pause %s-range classification across repeated pause and resume',
+    (_classification, bpm) => {
+      let state = activeMissionWithFreshSamples(bpm, 24_000)
+      for (const [pauseAt, resumeAt] of [
+        [25_000, 26_000],
+        [27_000, 28_000],
+      ] as const) {
+        state = apply(state, { type: 'manualPause', occurredAt: pauseAt })
+        state = apply(state, { type: 'manualResume', occurredAt: resumeAt })
+        expect(state.lifecycle.phase).toBe('activeMission')
+        if (state.lifecycle.phase !== 'activeMission') return
+        expect(
+          state.lifecycle.mission.classifier.stableClassification,
+        ).toBeNull()
+        expect(
+          state.lifecycle.mission.session.mission.stableClassification,
+        ).toBeNull()
+      }
+    },
+  )
+
+  it('orders a pause at the stale deadline as stale, invalidation, then suspension', () => {
+    let state = activeMissionWithFreshSamples(170)
+    state = apply(state, { type: 'manualPause', occurredAt: 25_000 })
+
+    expect(state.lifecycle.phase).toBe('suspended')
+    if (
+      state.lifecycle.phase !== 'suspended' ||
+      state.lifecycle.resumeTarget.phase !== 'activeMission'
+    )
+      return
+    const run = state.lifecycle.resumeTarget.mission
+    expect(run.classifier).toMatchObject({
+      signalQuality: 'insufficient',
+      stableClassification: null,
+      lastInvalidationReason: 'manualSuspension',
+    })
+    expect(run.session.mission).toMatchObject({
+      activeElapsedTimeMs: 4_000,
+      stability: 88,
+      playState: 'suspended',
+    })
+    expect(run.session.statistics.durationSegment).toEqual({
+      behavior: 'suspended',
+      startedAtTimeMs: 25_000,
+    })
+  })
+
+  it('uses authoritative unsuspended active time for deterministic hint eligibility and preserves hint use across reset', () => {
+    let state = run([
+      connected(),
+      begin(),
+      ...sustainedOperationalSamples(13_000),
+      advance(16_000),
+    ])
+    state = apply(state, { type: 'manualPause', occurredAt: 17_000 })
+    state = apply(state, { type: 'manualResume', occurredAt: 27_000 })
+    for (let time = 28_000; time <= 42_000; time += 1_000) {
+      state = apply(state, sample(time, 110))
+    }
+    expect(state.lifecycle.phase).toBe('activeMission')
+    if (state.lifecycle.phase !== 'activeMission') return
+    expect(
+      state.lifecycle.mission.session.mission.activeElapsedTimeMs,
+    ).toBeGreaterThanOrEqual(10_000)
+
+    state = apply(state, { type: 'puzzleHintRequested', occurredAt: 42_000 })
+    expect(state.lifecycle.phase).toBe('activeMission')
+    if (state.lifecycle.phase !== 'activeMission') return
+    expect(state.lifecycle.mission.hint).toMatchObject({
+      tileId: 'top-straight',
+      row: 0,
+      column: 1,
+    })
+    expect(state.lifecycle.mission.session.statistics.hintUsed).toBe(true)
+
+    state = apply(state, { type: 'puzzleReset', occurredAt: 42_000 })
+    if (state.lifecycle.phase !== 'activeMission') return
+    expect(state.lifecycle.mission.hint).toBeNull()
+    expect(state.lifecycle.mission.session.statistics.hintUsed).toBe(true)
   })
 
   it('ignores stale scheduler completion from an earlier run generation', () => {

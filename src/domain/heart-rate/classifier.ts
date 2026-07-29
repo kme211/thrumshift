@@ -63,6 +63,17 @@ export interface ClassificationChange {
 export interface ClassifierTransition {
   readonly state: ClassifierState
   readonly classificationChange: ClassificationChange | null
+  /**
+   * Signal authority changes in effective-time order. A late external fact can
+   * therefore project a derived deadline before it applies the fact itself.
+   */
+  readonly projections: readonly ClassifierProjection[]
+}
+
+export interface ClassifierProjection {
+  readonly occurrenceTimeMs: number
+  readonly signalQuality: SignalQuality
+  readonly stableClassification: RangeClassification | null
 }
 
 export function validateTargetRange(
@@ -164,6 +175,7 @@ function evaluateAt(
     return {
       state: invalidate(state, time, 'stale', 'staleSignal'),
       classificationChange: null,
+      projections: [],
     }
   }
 
@@ -186,6 +198,7 @@ function evaluateAt(
         validSampleTimesMs,
       },
       classificationChange: null,
+      projections: [],
     }
   }
 
@@ -234,6 +247,7 @@ function evaluateAt(
         current: candidateClassification,
         occurrenceTimeMs: time,
       },
+      projections: [],
     }
   }
 
@@ -249,6 +263,7 @@ function evaluateAt(
       validSampleTimesMs,
     },
     classificationChange: null,
+    projections: [],
   }
 }
 
@@ -266,6 +281,7 @@ function advance(
   }
 
   let classificationChange: ClassificationChange | null = null
+  const projections: ClassifierProjection[] = []
   const candidateDeadline =
     state.candidateSinceMs === null
       ? null
@@ -275,24 +291,47 @@ function advance(
       ? null
       : state.latestValidSampleTimeMs + tuning.staleAfterMs
 
-  // A scheduler wake-up is only a prompt. Preserve a pending dwell effect at
-  // its derived deadline before evaluating later density or stale boundaries.
+  function evaluateAndCollect(effectiveTimeMs: number): void {
+    const before = state
+    const transition = evaluateAt(state, effectiveTimeMs, range, tuning)
+    state = transition.state
+    classificationChange ??= transition.classificationChange
+    if (
+      before.signalQuality !== state.signalQuality ||
+      before.stableClassification !== state.stableClassification
+    ) {
+      projections.push({
+        occurrenceTimeMs: effectiveTimeMs,
+        signalQuality: state.signalQuality,
+        stableClassification: state.stableClassification,
+      })
+    }
+  }
+
+  // A scheduler wake-up is only a prompt. Preserve pending dwell and stale
+  // effects at their derived deadlines before evaluating the requested time.
   if (
     candidateDeadline !== null &&
     candidateDeadline > state.lastProcessedTimeMs &&
     candidateDeadline <= time &&
     (staleDeadline === null || candidateDeadline < staleDeadline)
   ) {
-    const atDeadline = evaluateAt(state, candidateDeadline, range, tuning)
-    state = atDeadline.state
-    classificationChange = atDeadline.classificationChange
+    evaluateAndCollect(candidateDeadline)
   }
 
-  const atRequestedTime = evaluateAt(state, time, range, tuning)
+  if (
+    staleDeadline !== null &&
+    staleDeadline > state.lastProcessedTimeMs &&
+    staleDeadline <= time
+  ) {
+    evaluateAndCollect(staleDeadline)
+  }
+
+  evaluateAndCollect(time)
   return {
-    state: atRequestedTime.state,
-    classificationChange:
-      classificationChange ?? atRequestedTime.classificationChange,
+    state,
+    classificationChange,
+    projections,
   }
 }
 
@@ -307,14 +346,27 @@ export function transitionClassifier(
   state = advanced.state
   if (fact.type === 'timeAdvanced') return advanced
   if (fact.type === 'invalidate') {
+    const invalidated = invalidate(
+      state,
+      fact.occurrenceTimeMs,
+      'insufficient',
+      fact.reason,
+    )
+    const projection =
+      state.signalQuality === invalidated.signalQuality &&
+      state.stableClassification === invalidated.stableClassification
+        ? []
+        : [
+            {
+              occurrenceTimeMs: fact.occurrenceTimeMs,
+              signalQuality: invalidated.signalQuality,
+              stableClassification: invalidated.stableClassification,
+            },
+          ]
     return {
-      state: invalidate(
-        state,
-        fact.occurrenceTimeMs,
-        'insufficient',
-        fact.reason,
-      ),
+      state: invalidated,
       classificationChange: advanced.classificationChange,
+      projections: [...advanced.projections, ...projection],
     }
   }
   if (
@@ -322,14 +374,27 @@ export function transitionClassifier(
     fact.bpm < tuning.plausibleBpm.minimum ||
     fact.bpm > tuning.plausibleBpm.maximum
   ) {
+    const invalidated = invalidate(
+      state,
+      fact.occurrenceTimeMs,
+      'invalid',
+      'invalidSample',
+    )
+    const projection =
+      state.signalQuality === invalidated.signalQuality &&
+      state.stableClassification === invalidated.stableClassification
+        ? []
+        : [
+            {
+              occurrenceTimeMs: fact.occurrenceTimeMs,
+              signalQuality: invalidated.signalQuality,
+              stableClassification: invalidated.stableClassification,
+            },
+          ]
     return {
-      state: invalidate(
-        state,
-        fact.occurrenceTimeMs,
-        'invalid',
-        'invalidSample',
-      ),
+      state: invalidated,
       classificationChange: advanced.classificationChange,
+      projections: [...advanced.projections, ...projection],
     }
   }
 
@@ -360,5 +425,6 @@ export function transitionClassifier(
     state: result.state,
     classificationChange:
       result.classificationChange ?? advanced.classificationChange,
+    projections: [...advanced.projections, ...result.projections],
   }
 }

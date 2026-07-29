@@ -11,6 +11,7 @@ import {
 import { PreMissionScreen } from '../features/PreMissionScreen'
 import { WarmupScreen } from '../features/WarmupScreen'
 import { LifecycleScreen } from '../features/LifecycleScreen'
+import { ActiveMissionScreen } from '../features/ActiveMissionScreen'
 import type { MonotonicClock } from '../platform/Clock'
 import type { PageVisibility } from '../platform/PageVisibility'
 import type { Scheduler } from '../platform/Scheduler'
@@ -24,6 +25,7 @@ import {
   warmupFlowReducer,
 } from './WarmupFlowController'
 import type { WarmupFlowFactPayload } from './WarmupFlowController'
+import { getMissionHintEligibility } from './MissionRun'
 
 const DevelopmentDiagnostics = import.meta.env.DEV
   ? lazy(() =>
@@ -43,9 +45,7 @@ interface AppFlowProps {
 }
 
 function wantsWakeLock(phase: string): boolean {
-  return (
-    phase === 'warming' || phase === 'countdown' || phase === 'activeMission'
-  )
+  return phase === 'warming' || phase === 'countdown'
 }
 
 export function AppFlow({
@@ -104,7 +104,8 @@ export function AppFlow({
     scheduler.cancelAll()
     if (
       state.lifecycle.phase !== 'warming' &&
-      state.lifecycle.phase !== 'countdown'
+      state.lifecycle.phase !== 'countdown' &&
+      state.lifecycle.phase !== 'activeMission'
     )
       return
     return scheduler.schedule(250, (occurredAt) =>
@@ -184,6 +185,47 @@ export function AppFlow({
         onConnect={() => void source.connect()}
         onBack={() =>
           dispatchFact({ type: 'backToBriefing', occurredAt: clock.now() })
+        }
+      />
+    )
+  } else if (
+    state.lifecycle.phase === 'activeMission' ||
+    (state.lifecycle.phase === 'suspended' &&
+      state.lifecycle.resumeTarget.phase === 'activeMission')
+  ) {
+    const run =
+      state.lifecycle.phase === 'activeMission'
+        ? state.lifecycle.mission
+        : state.lifecycle.resumeTarget.phase === 'activeMission'
+          ? state.lifecycle.resumeTarget.mission
+          : null
+    if (run === null) throw new Error('Active mission screen requires a run')
+    const hintEligibility = getMissionHintEligibility(run)
+    screen = (
+      <ActiveMissionScreen
+        run={run}
+        telemetryStatus={state.telemetryStatus}
+        paused={state.lifecycle.phase === 'suspended'}
+        hintEligible={hintEligibility.eligible}
+        hintRemainingMs={hintEligibility.remainingMs}
+        onRotate={(tileId) =>
+          dispatchFact({
+            type: 'puzzleTileRotated',
+            occurredAt: clock.now(),
+            tileId,
+          })
+        }
+        onHint={() =>
+          dispatchFact({ type: 'puzzleHintRequested', occurredAt: clock.now() })
+        }
+        onReset={() =>
+          dispatchFact({ type: 'puzzleReset', occurredAt: clock.now() })
+        }
+        onPause={() =>
+          dispatchFact({ type: 'manualPause', occurredAt: clock.now() })
+        }
+        onResume={() =>
+          dispatchFact({ type: 'manualResume', occurredAt: clock.now() })
         }
       />
     )

@@ -46,6 +46,10 @@ export interface MissionStatisticsTuning {
   readonly minimumUsableDurationMs: number
 }
 
+export interface PuzzleTuning {
+  readonly hintEligibilityMs: number
+}
+
 export interface GameplayTuning {
   readonly targetRange: TargetRangeTuning
   readonly heartRateClassifier: HeartRateClassifierTuning
@@ -53,6 +57,7 @@ export interface GameplayTuning {
   readonly countdown: CountdownTuning
   readonly stability: StabilityTuning
   readonly missionStatistics: MissionStatisticsTuning
+  readonly puzzle: PuzzleTuning
 }
 
 export const defaultGameplayTuning: GameplayTuning = {
@@ -86,6 +91,7 @@ export const defaultGameplayTuning: GameplayTuning = {
     minimumValidSampleCount: 3,
     minimumUsableDurationMs: 4_000,
   },
+  puzzle: { hintEligibilityMs: 10_000 },
 }
 
 function positiveInteger(value: number, name: string): void {
@@ -236,6 +242,7 @@ export function validateGameplayTuning(tuning: GameplayTuning): GameplayTuning {
   )
   positiveInteger(warmup.qualificationMs, 'qualificationMs')
   positiveInteger(countdown.durationMs, 'countdown.durationMs')
+  positiveInteger(tuning.puzzle.hintEligibilityMs, 'puzzle.hintEligibilityMs')
   validateMissionStatisticsTuning(missionStatistics)
   validateStabilityTuning(stability)
   return tuning

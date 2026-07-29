@@ -2,9 +2,12 @@ import { useEffect, useRef } from 'react'
 
 import type { AppState } from '../app/AppState'
 import type { WarmupSession } from '../app/WarmupFlowController'
-import type { ShellMissionState, ShellResult } from '../app/ShellState'
 
-type ShellAppState = AppState<WarmupSession, ShellMissionState, ShellResult>
+type ShellAppState = AppState<
+  WarmupSession,
+  unknown,
+  { readonly outcome: 'success' | 'failure' }
+>
 
 interface ScreenContent {
   readonly eyebrow: string

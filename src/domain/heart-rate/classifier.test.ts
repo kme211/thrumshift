@@ -288,6 +288,28 @@ describe('hysteresis, dwell, staleness, and invalidation', () => {
     expect(large.state.stableClassification).toBeNull()
   })
 
+  it('exposes derived authority projections at their exact deadlines', () => {
+    const result = transitionClassifier(
+      run([sample(0, 110), sample(500, 110), sample(1_000, 110)]),
+      { type: 'timeAdvanced', occurrenceTimeMs: 5_000 },
+      range,
+      tuning,
+    )
+
+    expect(result.projections).toEqual([
+      {
+        occurrenceTimeMs: 3_000,
+        signalQuality: 'usable',
+        stableClassification: 'operational',
+      },
+      {
+        occurrenceTimeMs: 4_000,
+        signalQuality: 'stale',
+        stableClassification: null,
+      },
+    ])
+  })
+
   it('timestamps classification at the derived dwell deadline', () => {
     const result = transitionClassifier(
       run([sample(0, 110), sample(500, 110), sample(1_000, 110)]),

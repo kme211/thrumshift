@@ -12,6 +12,19 @@ async function assertNoHorizontalOverflow(
   ).toBe(true)
 }
 
+async function enterActiveMission(page: import('@playwright/test').Page) {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Connect simulator' }).click()
+  const cadence = page.getByLabel('Sample cadence (ms)')
+  await cadence.fill('250')
+  await page.getByRole('button', { name: 'Start Samples' }).click()
+  await page.getByRole('button', { name: 'Begin Warm-Up' }).click()
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Reactor Cooling Failure' }),
+  ).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText('Active mission')).toBeVisible()
+}
+
 async function assertTilesInsideViewport(
   page: import('@playwright/test').Page,
 ) {
@@ -63,7 +76,7 @@ for (const viewport of [
 ]) {
   test(`puzzle fits ${viewport.name} without overflow`, async ({ page }) => {
     await page.setViewportSize(viewport)
-    await page.goto('/')
+    await enterActiveMission(page)
     const board = page.getByRole('group', {
       name: 'Three by three coolant-routing board',
     })
@@ -80,7 +93,7 @@ for (const viewport of [
 
 test('viewport orientation changes preserve puzzle state', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 640 })
-  await page.goto('/')
+  await enterActiveMission(page)
   const tile = page.getByRole('button', {
     name: /Row 1, column 2, straight pipe/,
   })
@@ -93,7 +106,7 @@ test('viewport orientation changes preserve puzzle state', async ({ page }) => {
 
 test('reduced motion removes tile rotation animation', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  await page.goto('/')
+  await enterActiveMission(page)
   const graphic = page.locator('.coolant-tile__graphic').first()
   expect(
     await graphic.evaluate((node) => getComputedStyle(node).animationName),
@@ -104,7 +117,7 @@ test('remains operable at 200 percent page zoom without board overflow', async (
   page,
 }) => {
   await page.setViewportSize({ width: 768, height: 1024 })
-  await page.goto('/')
+  await enterActiveMission(page)
   await page.evaluate(() => {
     document.documentElement.style.zoom = '2'
   })
@@ -114,7 +127,10 @@ test('remains operable at 200 percent page zoom without board overflow', async (
   await assertNoHorizontalOverflow(page)
   await assertTilesInsideViewport(page)
   await rotateAndCheckFocusedEdgeTile(page)
-  await expect(page.getByRole('button', { name: 'Show hint' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Request hint' })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Pause mission' }),
+  ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Reset puzzle' })).toBeVisible()
 })
 
@@ -122,7 +138,7 @@ test('reflows below 320 CSS pixels while preserving usable tiles', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 180, height: 900 })
-  await page.goto('/')
+  await enterActiveMission(page)
   const board = page.getByRole('group', {
     name: 'Three by three coolant-routing board',
   })
@@ -138,7 +154,10 @@ test('reflows below 320 CSS pixels while preserving usable tiles', async ({
   expect(Math.min(...layout.tileWidths)).toBeGreaterThanOrEqual(48)
   await assertTilesInsideViewport(page)
   await rotateAndCheckFocusedEdgeTile(page)
-  await expect(page.getByRole('button', { name: 'Show hint' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Request hint' })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Pause mission' }),
+  ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Reset puzzle' })).toBeVisible()
 })
 
@@ -146,7 +165,7 @@ test('forced colors preserves a non-color distinction for receiving coolant', as
   page,
 }) => {
   await page.emulateMedia({ forcedColors: 'active' })
-  await page.goto('/')
+  await enterActiveMission(page)
   await expect(
     page.getByRole('group', { name: 'Three by three coolant-routing board' }),
   ).toBeVisible()
@@ -180,4 +199,21 @@ test('forced colors preserves a non-color distinction for receiving coolant', as
   expect(distinction.inactivePatternCount).toBe(0)
   expect(distinction.dashArray).not.toBe('none')
   expect(distinction.strokeWidth).toBeGreaterThan(0)
+})
+
+test('manual pause freezes controls and restores logical keyboard focus', async ({
+  page,
+}) => {
+  await enterActiveMission(page)
+  const tile = page.getByRole('button', { name: /Row 1, column 2/ })
+  const before = await tile.getAttribute('aria-label')
+  await page.getByRole('button', { name: 'Pause mission' }).click()
+  const resume = page.getByRole('button', { name: 'Resume mission' })
+  await expect(resume).toBeFocused()
+  await expect(tile).toBeDisabled()
+  await resume.press('Enter')
+  await expect(
+    page.getByRole('button', { name: 'Pause mission' }),
+  ).toBeFocused()
+  await expect(tile).toHaveAttribute('aria-label', before!)
 })

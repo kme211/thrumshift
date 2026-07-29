@@ -59,7 +59,7 @@ describe('development diagnostic export', () => {
 })
 
 describe('DevelopmentDiagnostics', () => {
-  it('extends the existing diagnostics surface with the isolated puzzle workbench', () => {
+  it('keeps one diagnostics surface without a second mission puzzle authority', () => {
     const clock: MonotonicClock = { now: () => 0 }
     render(
       <DevelopmentDiagnostics
@@ -72,13 +72,10 @@ describe('DevelopmentDiagnostics', () => {
       screen.getByRole('heading', { name: 'Development diagnostics' }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { name: 'Coolant routing workbench' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('group', {
+      screen.queryByRole('group', {
         name: 'Three by three coolant-routing board',
       }),
-    ).toBeInTheDocument()
+    ).not.toBeInTheDocument()
   })
 
   it('controls source-owned continuous emission without owning its lifecycle', async () => {

@@ -9,7 +9,6 @@ import type {
 } from '../domain/heart-rate/classifier'
 import { isValidHeartRateBpm } from '../domain/heart-rate/range'
 import type { HeartRateSample } from '../domain/heart-rate/types'
-import { getMissionIntervalBehavior } from '../domain/mission/activeMission'
 import { advanceMissionSession } from '../domain/mission/missionSession'
 import type { MissionSessionFact } from '../domain/mission/missionStatistics'
 import {
@@ -27,6 +26,10 @@ import { createMissionRun } from './MissionRun'
 import type { MissionRun } from './MissionRun'
 import { appendFlowDiagnostics } from './FlowDiagnostics'
 import type { WarmupTelemetryDiagnosticEntry } from './FlowDiagnostics'
+import {
+  announcementForActiveRunTransition,
+  announcementForTelemetryStatus,
+} from './FlowAnnouncements'
 import {
   advanceWarmupSession,
   createWarmupSession,
@@ -102,6 +105,10 @@ export type WarmupFlowFact = WarmupFlowFactPayload & {
 }
 
 const tuning = defaultGameplayTuning
+const announcementTuning = {
+  stabilityMinimum: tuning.stability.minimum,
+  stabilityMaximum: tuning.stability.maximum,
+}
 
 export function createWarmupFlowState(
   diagnosticsEnabled = false,
@@ -296,58 +303,6 @@ function advanceActiveRunSignalAuthority(
   )
 }
 
-function activeRunAnnouncement(
-  before: MissionRun,
-  after: MissionRun,
-  fallback: string,
-): string {
-  const announcements: string[] = []
-  const previousClassification = before.classifier.stableClassification
-  const currentClassification = after.classifier.stableClassification
-  if (previousClassification !== currentClassification) {
-    if (currentClassification === 'below')
-      announcements.push('Heart rate is below range')
-    if (currentClassification === 'operational')
-      announcements.push('Heart rate is operational')
-    if (currentClassification === 'above')
-      announcements.push('Heart rate is above range')
-    if (currentClassification === null)
-      announcements.push('Stable heart-rate classification unavailable')
-  }
-
-  function stabilityTrend(run: MissionRun): string {
-    const behavior = getMissionIntervalBehavior(run.session.mission)
-    if (behavior === 'activeBelowRange' || behavior === 'activeAboveRange')
-      return 'decreasing'
-    if (
-      behavior === 'activeOperational' &&
-      run.session.mission.stability < tuning.stability.maximum
-    )
-      return 'recovering'
-    if (behavior === 'suspended') return 'paused'
-    return 'holding'
-  }
-
-  const previousTrend = stabilityTrend(before)
-  const currentTrend = stabilityTrend(after)
-  if (previousTrend !== currentTrend && currentTrend !== 'paused') {
-    announcements.push(`Station stability is ${currentTrend}`)
-  }
-
-  const previous = before.session.mission.stability
-  const current = after.session.mission.stability
-  for (const threshold of [75, 50, 25]) {
-    if (previous > threshold && current <= threshold) {
-      announcements.push(
-        threshold === 75
-          ? 'Station stability warning: 75 percent'
-          : `Station stability critical: ${threshold} percent`,
-      )
-    }
-  }
-  return announcements.length === 0 ? fallback : announcements.join('. ')
-}
-
 function runIdFor(lifecycle: WarmupFlowLifecycle): string | null {
   return lifecycle.phase === 'preMission'
     ? null
@@ -399,13 +354,6 @@ function recoverFromStaleSignal(
     })
   }
   return next
-}
-
-function statusAnnouncement(status: TelemetrySourceStatus): string {
-  if (status.state === 'connected') return 'Heart-rate monitor connected'
-  if (status.state === 'connecting') return 'Connecting to heart-rate monitor'
-  if (status.state === 'disconnected') return 'Heart-rate monitor disconnected'
-  return status.error.message
 }
 
 function targetFromDraft(state: WarmupFlowState): {
@@ -541,7 +489,12 @@ function reduceWarmupFlow(
       return {
         ...state,
         lifecycle: updateRunLifecycle(state.lifecycle, advanced),
-        announcement: activeRunAnnouncement(run, advanced, state.announcement),
+        announcement: announcementForActiveRunTransition(
+          run,
+          advanced,
+          state.announcement,
+          announcementTuning,
+        ),
       }
     }
     const invalidated = transitionClassifier(
@@ -618,7 +571,12 @@ function reduceWarmupFlow(
       return {
         ...state,
         lifecycle: updateRunLifecycle(state.lifecycle, advanced),
-        announcement: activeRunAnnouncement(run, advanced, state.announcement),
+        announcement: announcementForActiveRunTransition(
+          run,
+          advanced,
+          state.announcement,
+          announcementTuning,
+        ),
       }
     }
     advanced = advanceRun(advanced, {
@@ -630,7 +588,12 @@ function reduceWarmupFlow(
       return {
         ...state,
         lifecycle: updateRunLifecycle(state.lifecycle, advanced),
-        announcement: activeRunAnnouncement(run, advanced, state.announcement),
+        announcement: announcementForActiveRunTransition(
+          run,
+          advanced,
+          state.announcement,
+          announcementTuning,
+        ),
       }
     }
     const puzzle = rotateTile(advanced.puzzle, fact.tileId)
@@ -724,7 +687,12 @@ function reduceWarmupFlow(
       announcement:
         advanced.session.result === null
           ? state.announcement
-          : activeRunAnnouncement(run, advanced, state.announcement),
+          : announcementForActiveRunTransition(
+              run,
+              advanced,
+              state.announcement,
+              announcementTuning,
+            ),
     }
   }
   if (fact.type === 'status') {
@@ -789,7 +757,7 @@ function reduceWarmupFlow(
       ...state,
       lifecycle,
       telemetryStatus: fact.status,
-      announcement: statusAnnouncement(fact.status),
+      announcement: announcementForTelemetryStatus(fact.status),
     }
   }
   if (fact.type === 'sample') {
@@ -810,10 +778,11 @@ function reduceWarmupFlow(
         return {
           ...state,
           lifecycle: updateRunLifecycle(state.lifecycle, advanced),
-          announcement: activeRunAnnouncement(
+          announcement: announcementForActiveRunTransition(
             run,
             advanced,
             state.announcement,
+            announcementTuning,
           ),
         }
       }
@@ -840,7 +809,12 @@ function reduceWarmupFlow(
       return {
         ...state,
         lifecycle: updateRunLifecycle(state.lifecycle, advanced),
-        announcement: activeRunAnnouncement(run, advanced, state.announcement),
+        announcement: announcementForActiveRunTransition(
+          run,
+          advanced,
+          state.announcement,
+          announcementTuning,
+        ),
       }
     }
     const session = liveSession(state.lifecycle)
@@ -946,7 +920,12 @@ function reduceWarmupFlow(
     return {
       ...state,
       lifecycle: updateRunLifecycle(state.lifecycle, advanced),
-      announcement: activeRunAnnouncement(run, advanced, state.announcement),
+      announcement: announcementForActiveRunTransition(
+        run,
+        advanced,
+        state.announcement,
+        announcementTuning,
+      ),
     }
   }
   const session = liveSession(state.lifecycle)

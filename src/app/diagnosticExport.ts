@@ -6,9 +6,9 @@ import {
 } from '../domain/mission/warmup'
 import type {
   WarmupFlowState,
-  WarmupSession,
   WarmupTelemetryDiagnosticEntry,
 } from './WarmupFlowController'
+import { getWarmupDiagnosticSession } from './FlowDiagnostics'
 
 export interface DiagnosticEnvironment {
   readonly appVersion?: string
@@ -38,28 +38,12 @@ export interface DiagnosticLogExport {
   readonly events: readonly WarmupTelemetryDiagnosticEntry[]
 }
 
-function currentSession(state: WarmupFlowState): WarmupSession | null {
-  if (
-    state.lifecycle.phase === 'warming' ||
-    state.lifecycle.phase === 'countdown'
-  ) {
-    return state.lifecycle.warmup
-  }
-  if (
-    state.lifecycle.phase === 'suspended' &&
-    state.lifecycle.resumeTarget.phase !== 'activeMission'
-  ) {
-    return state.lifecycle.resumeTarget.warmup
-  }
-  return null
-}
-
 export function createDiagnosticLogExport(
   state: WarmupFlowState,
   environment: DiagnosticEnvironment,
   exportedAt = new Date().toISOString(),
 ): DiagnosticLogExport {
-  const session = currentSession(state)
+  const session = getWarmupDiagnosticSession(state)
   return {
     schemaVersion: 1,
     exportedAt,

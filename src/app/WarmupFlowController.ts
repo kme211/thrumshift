@@ -9,7 +9,6 @@ import type {
   ClassifierInvalidationReason,
   ClassifierState,
   ClassifierTransition,
-  RangeClassification,
   TargetRange,
 } from '../domain/heart-rate/classifier'
 import { isValidHeartRateBpm } from '../domain/heart-rate/range'
@@ -23,11 +22,7 @@ import {
   rotateTile,
   selectPuzzleHint,
 } from '../domain/puzzle/model'
-import {
-  createWarmupState,
-  getWarmupProgressMs,
-  transitionWarmup,
-} from '../domain/mission/warmup'
+import { createWarmupState, transitionWarmup } from '../domain/mission/warmup'
 import type { WarmupFact, WarmupState } from '../domain/mission/warmup'
 import type { TelemetrySourceStatus } from '../telemetry/HeartRateTelemetrySource'
 import type { AppState } from './AppState'
@@ -35,6 +30,10 @@ import { appReducer } from './appReducer'
 import type { MissionResult } from '../domain/mission/MissionResult'
 import { createMissionRun } from './MissionRun'
 import type { MissionRun } from './MissionRun'
+import { appendFlowDiagnostics } from './FlowDiagnostics'
+import type { WarmupTelemetryDiagnosticEntry } from './FlowDiagnostics'
+
+export type { WarmupTelemetryDiagnosticEntry } from './FlowDiagnostics'
 
 export interface WarmupSession {
   readonly targetRange: TargetRange
@@ -63,18 +62,6 @@ export interface WarmupFlowState {
   readonly diagnosticLastOccurrenceMs: number | null
   readonly lastAppliedOccurrenceTimeMs: number | null
   readonly lastAppliedSequence: number
-}
-
-export interface WarmupTelemetryDiagnosticEntry {
-  readonly sequence: number
-  readonly occurrenceTimeMs: number
-  readonly category: string
-  readonly details: Record<string, unknown>
-  readonly lifecycleBefore: string
-  readonly lifecycleAfter: string
-  readonly transportStatus: string
-  readonly signalQuality: string
-  readonly stableClassification: RangeClassification | null
 }
 
 export type WarmupFlowFactPayload =
@@ -1031,177 +1018,15 @@ function reduceWarmupFlow(
 
 const DIAGNOSTIC_LOG_LIMIT = 1_000
 
-function diagnosticOccurrenceTime(fact: WarmupFlowFact): number {
+function factOccurrenceTime(fact: WarmupFlowFact): number {
   return fact.type === 'sample' ? fact.sample.occurrenceTimeMs : fact.occurredAt
-}
-
-function diagnosticState(state: WarmupFlowState): {
-  readonly lifecycle: string
-  readonly transportStatus: string
-  readonly signalQuality: string
-  readonly stableClassification: RangeClassification | null
-  readonly invalidationReason: ClassifierInvalidationReason | null
-  readonly warmupStage: string | null
-  readonly warmupProgressMs: number
-} {
-  const session = liveSession(state.lifecycle)
-  const run = liveRun(state.lifecycle)
-  return {
-    lifecycle: state.lifecycle.phase,
-    transportStatus: state.telemetryStatus.state,
-    signalQuality:
-      session?.classifier.signalQuality ??
-      run?.classifier.signalQuality ??
-      'unavailable',
-    stableClassification:
-      session?.classifier.stableClassification ??
-      run?.classifier.stableClassification ??
-      null,
-    invalidationReason:
-      session?.classifier.lastInvalidationReason ??
-      run?.classifier.lastInvalidationReason ??
-      null,
-    warmupStage: session?.warmup.phase ?? null,
-    warmupProgressMs:
-      session === null
-        ? 0
-        : getWarmupProgressMs(session.warmup, tuning.warmup.qualificationMs),
-  }
-}
-
-interface PendingDiagnosticEvent {
-  readonly category: string
-  readonly details?: Record<string, unknown>
-}
-
-function diagnosticEvents(
-  before: WarmupFlowState,
-  fact: WarmupFlowFact,
-  after: WarmupFlowState,
-  ignoredOutOfOrder: boolean,
-): readonly PendingDiagnosticEvent[] {
-  const beforeState = diagnosticState(before)
-  const afterState = diagnosticState(after)
-  const events: PendingDiagnosticEvent[] = []
-
-  if (ignoredOutOfOrder) {
-    return [
-      {
-        category: 'ignoredOutOfOrderFact',
-        details: {
-          factType: fact.type,
-          sequence: fact.sequence,
-          occurrenceTimeMs: diagnosticOccurrenceTime(fact),
-          lastAppliedSequence: before.lastAppliedSequence,
-          lastAppliedOccurrenceTimeMs: before.lastAppliedOccurrenceTimeMs,
-        },
-      },
-    ]
-  }
-
-  if (fact.type === 'status') {
-    events.push({
-      category:
-        fact.status.state === 'error' ? 'error' : 'connectionStatusChanged',
-      details:
-        fact.status.state === 'error'
-          ? { safeCategory: fact.status.error.code }
-          : { status: fact.status.state },
-    })
-  } else if (fact.type === 'sample') {
-    const accepted =
-      isValidHeartRateBpm(fact.sample.bpm) &&
-      fact.sample.bpm >= tuning.heartRateClassifier.plausibleBpm.minimum &&
-      fact.sample.bpm <= tuning.heartRateClassifier.plausibleBpm.maximum
-    events.push({
-      category: accepted ? 'sampleReceived' : 'sampleRejected',
-      details: {
-        bpm: fact.sample.bpm,
-        sourceType: fact.sample.source.type,
-        rrIntervalCount: fact.sample.rrIntervalsMs?.length ?? 0,
-        ...(accepted ? {} : { reason: 'invalid-or-implausible-bpm' }),
-      },
-    })
-  } else if (fact.type === 'visibility') {
-    events.push({
-      category: 'visibilityChanged',
-      details: { state: fact.state },
-    })
-  } else if (
-    fact.type === 'timeAdvanced' &&
-    fact.runGeneration !== before.runGeneration
-  ) {
-    events.push({
-      category: 'ignoredStaleGenerationCallback',
-      details: {
-        callbackGeneration: fact.runGeneration,
-        currentGeneration: before.runGeneration,
-      },
-    })
-  }
-
-  if (beforeState.signalQuality !== afterState.signalQuality) {
-    events.push({
-      category: 'signalQualityChanged',
-      details: {
-        from: beforeState.signalQuality,
-        to: afterState.signalQuality,
-      },
-    })
-  }
-  if (beforeState.stableClassification !== afterState.stableClassification) {
-    events.push({
-      category: 'classifierTransition',
-      details: {
-        from: beforeState.stableClassification,
-        to: afterState.stableClassification,
-      },
-    })
-  }
-  if (
-    afterState.invalidationReason !== null &&
-    afterState.invalidationReason !== beforeState.invalidationReason
-  ) {
-    events.push({
-      category: 'classifierInvalidated',
-      details: { reason: afterState.invalidationReason },
-    })
-  }
-  if (beforeState.warmupProgressMs > 0 && afterState.warmupProgressMs === 0) {
-    events.push({ category: 'warmupProgressReset' })
-  }
-  if (
-    beforeState.warmupStage !== 'countdown' &&
-    afterState.warmupStage === 'countdown'
-  ) {
-    events.push({ category: 'warmupQualified' })
-    events.push({ category: 'countdownStarted' })
-  } else if (
-    beforeState.warmupStage === 'countdown' &&
-    afterState.warmupStage === 'warming'
-  ) {
-    events.push({ category: 'countdownCancelled' })
-  }
-  if (
-    before.lifecycle.phase === 'countdown' &&
-    after.lifecycle.phase === 'activeMission'
-  ) {
-    events.push({ category: 'countdownCompleted' })
-  }
-  if (before.lifecycle.phase !== after.lifecycle.phase) {
-    events.push({
-      category: 'lifecycleTransition',
-      details: { from: before.lifecycle.phase, to: after.lifecycle.phase },
-    })
-  }
-  return events
 }
 
 export function warmupFlowReducer(
   state: WarmupFlowState,
   fact: WarmupFlowFact,
 ): WarmupFlowState {
-  const occurrenceTime = diagnosticOccurrenceTime(fact)
+  const occurrenceTime = factOccurrenceTime(fact)
   const ignoredOutOfOrder =
     fact.sequence <= state.lastAppliedSequence ||
     (state.lastAppliedOccurrenceTimeMs !== null &&
@@ -1225,37 +1050,19 @@ export function warmupFlowReducer(
         lastAppliedSequence: fact.sequence,
       }
   if (!state.diagnosticsEnabled) return next
-  const pendingEvents = diagnosticEvents(state, fact, next, ignoredOutOfOrder)
-  if (pendingEvents.length === 0) return next
-  const sessionStart = state.diagnosticSessionStartMs ?? occurrenceTime
-  const loggedOccurrenceTime = Math.max(
+  const diagnosticPatch = appendFlowDiagnostics({
+    before: state,
+    fact,
+    after: next,
     occurrenceTime,
-    state.diagnosticLastOccurrenceMs ?? occurrenceTime,
-  )
-  const firstSequence =
-    (state.diagnosticLog[state.diagnosticLog.length - 1]?.sequence ?? 0) + 1
-  const afterState = diagnosticState(next)
-  const entries = pendingEvents.map(
-    ({ category, details = {} }, index): WarmupTelemetryDiagnosticEntry => ({
-      sequence: firstSequence + index,
-      occurrenceTimeMs: Math.max(0, loggedOccurrenceTime - sessionStart),
-      category,
-      details,
-      lifecycleBefore: state.lifecycle.phase,
-      lifecycleAfter: next.lifecycle.phase,
-      transportStatus: afterState.transportStatus,
-      signalQuality: afterState.signalQuality,
-      stableClassification: afterState.stableClassification,
-    }),
-  )
-  return {
-    ...next,
-    diagnosticSessionStartMs: sessionStart,
-    diagnosticLastOccurrenceMs: loggedOccurrenceTime,
-    diagnosticLog: [...state.diagnosticLog, ...entries].slice(
-      -DIAGNOSTIC_LOG_LIMIT,
-    ),
-  }
+    ignoredOutOfOrder,
+    tuning: {
+      plausibleBpm: tuning.heartRateClassifier.plausibleBpm,
+      warmupQualificationMs: tuning.warmup.qualificationMs,
+    },
+    limit: DIAGNOSTIC_LOG_LIMIT,
+  })
+  return diagnosticPatch === null ? next : { ...next, ...diagnosticPatch }
 }
 
 export function canBeginWarmup(state: WarmupFlowState): boolean {

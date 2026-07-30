@@ -25,7 +25,7 @@ import type { MissionResult } from '../domain/mission/MissionResult'
 import { createMissionRun } from './MissionRun'
 import type { MissionRun } from './MissionRun'
 import { appendFlowDiagnostics } from './FlowDiagnostics'
-import type { WarmupTelemetryDiagnosticEntry } from './FlowDiagnostics'
+import type { FlowDiagnosticEntry } from './FlowDiagnostics'
 import {
   announcementForActiveRunTransition,
   announcementForTelemetryStatus,
@@ -37,16 +37,16 @@ import {
 } from './WarmupSession'
 import type { WarmupSession } from './WarmupSession'
 
-export type { WarmupTelemetryDiagnosticEntry } from './FlowDiagnostics'
+export type { FlowDiagnosticEntry } from './FlowDiagnostics'
 
-export type WarmupFlowLifecycle = AppState<
+export type MissionFlowLifecycle = AppState<
   WarmupSession,
   MissionRun,
   MissionResult
 >
 
-export interface WarmupFlowState {
-  readonly lifecycle: WarmupFlowLifecycle
+export interface MissionFlowState {
+  readonly lifecycle: MissionFlowLifecycle
   readonly targetRange: TargetRange
   readonly targetDraft: { readonly lower: string; readonly upper: string }
   readonly targetError: string | null
@@ -55,14 +55,14 @@ export interface WarmupFlowState {
   readonly announcement: string
   readonly runGeneration: number
   readonly diagnosticsEnabled: boolean
-  readonly diagnosticLog: readonly WarmupTelemetryDiagnosticEntry[]
+  readonly diagnosticLog: readonly FlowDiagnosticEntry[]
   readonly diagnosticSessionStartMs: number | null
   readonly diagnosticLastOccurrenceMs: number | null
   readonly lastAppliedOccurrenceTimeMs: number | null
   readonly lastAppliedSequence: number
 }
 
-export type WarmupFlowFactPayload =
+export type MissionFlowFactPayload =
   | {
       readonly type: 'status'
       readonly occurredAt: number
@@ -100,7 +100,7 @@ export type WarmupFlowFactPayload =
   | { readonly type: 'manualResume'; readonly occurredAt: number }
   | { readonly type: 'resetDiagnostics'; readonly occurredAt: number }
 
-export type WarmupFlowFact = WarmupFlowFactPayload & {
+export type MissionFlowFact = MissionFlowFactPayload & {
   readonly sequence: number
 }
 
@@ -110,9 +110,9 @@ const announcementTuning = {
   stabilityMaximum: tuning.stability.maximum,
 }
 
-export function createWarmupFlowState(
+export function createMissionFlowState(
   diagnosticsEnabled = false,
-): WarmupFlowState {
+): MissionFlowState {
   const targetRange = {
     lowerBpm: tuning.targetRange.defaultLowerBpm,
     upperBpm: tuning.targetRange.defaultUpperBpm,
@@ -138,7 +138,7 @@ export function createWarmupFlowState(
   }
 }
 
-function liveSession(lifecycle: WarmupFlowLifecycle): WarmupSession | null {
+function liveSession(lifecycle: MissionFlowLifecycle): WarmupSession | null {
   if (lifecycle.phase === 'warming' || lifecycle.phase === 'countdown') {
     return lifecycle.warmup
   }
@@ -152,10 +152,10 @@ function liveSession(lifecycle: WarmupFlowLifecycle): WarmupSession | null {
 }
 
 function applySession(
-  lifecycle: WarmupFlowLifecycle,
+  lifecycle: MissionFlowLifecycle,
   session: WarmupSession,
   sequence = 0,
-): WarmupFlowLifecycle {
+): MissionFlowLifecycle {
   const runId =
     lifecycle.phase === 'suspended'
       ? lifecycle.resumeTarget.runId
@@ -212,7 +212,7 @@ function applySession(
   return next
 }
 
-function liveRun(lifecycle: WarmupFlowLifecycle): MissionRun | null {
+function liveRun(lifecycle: MissionFlowLifecycle): MissionRun | null {
   if (lifecycle.phase === 'activeMission') return lifecycle.mission
   if (
     lifecycle.phase === 'suspended' &&
@@ -224,9 +224,9 @@ function liveRun(lifecycle: WarmupFlowLifecycle): MissionRun | null {
 }
 
 function updateRunLifecycle(
-  lifecycle: WarmupFlowLifecycle,
+  lifecycle: MissionFlowLifecycle,
   run: MissionRun,
-): WarmupFlowLifecycle {
+): MissionFlowLifecycle {
   const runId = runIdFor(lifecycle)
   if (runId === null) return lifecycle
   let next = appReducer(lifecycle, {
@@ -303,7 +303,7 @@ function advanceActiveRunSignalAuthority(
   )
 }
 
-function runIdFor(lifecycle: WarmupFlowLifecycle): string | null {
+function runIdFor(lifecycle: MissionFlowLifecycle): string | null {
   return lifecycle.phase === 'preMission'
     ? null
     : lifecycle.phase === 'suspended'
@@ -312,10 +312,10 @@ function runIdFor(lifecycle: WarmupFlowLifecycle): string | null {
 }
 
 function recoverFromStaleSignal(
-  lifecycle: WarmupFlowLifecycle,
+  lifecycle: MissionFlowLifecycle,
   session: WarmupSession,
   occurredAt: number,
-): WarmupFlowLifecycle {
+): MissionFlowLifecycle {
   let next = applySession(lifecycle, session)
   if (
     next.phase !== 'suspended' ||
@@ -356,7 +356,7 @@ function recoverFromStaleSignal(
   return next
 }
 
-function targetFromDraft(state: WarmupFlowState): {
+function targetFromDraft(state: MissionFlowState): {
   readonly range: TargetRange | null
   readonly error: string | null
 } {
@@ -389,15 +389,15 @@ function targetFromDraft(state: WarmupFlowState): {
   }
 }
 
-type FactOf<Type extends WarmupFlowFact['type']> = Extract<
-  WarmupFlowFact,
+type FactOf<Type extends MissionFlowFact['type']> = Extract<
+  MissionFlowFact,
   { readonly type: Type }
 >
 
 function handleTargetDraftChange(
-  state: WarmupFlowState,
+  state: MissionFlowState,
   fact: FactOf<'targetDraftChanged'>,
-): WarmupFlowState {
+): MissionFlowState {
   const next = {
     ...state,
     targetDraft: { ...state.targetDraft, [fact.field]: fact.value },
@@ -406,9 +406,9 @@ function handleTargetDraftChange(
 }
 
 function handleTargetCommit(
-  state: WarmupFlowState,
+  state: MissionFlowState,
   fact: FactOf<'targetCommitted'>,
-): WarmupFlowState {
+): MissionFlowState {
   const validated = targetFromDraft(state)
   if (validated.range === null) {
     return { ...state, targetError: validated.error }
@@ -437,7 +437,7 @@ function handleTargetCommit(
   }
 }
 
-function handleSourceChange(state: WarmupFlowState): WarmupFlowState {
+function handleSourceChange(state: MissionFlowState): MissionFlowState {
   return {
     ...state,
     telemetryStatus: { state: 'disconnected' },
@@ -447,9 +447,9 @@ function handleSourceChange(state: WarmupFlowState): WarmupFlowState {
 }
 
 function handleWarmupStart(
-  state: WarmupFlowState,
+  state: MissionFlowState,
   fact: FactOf<'beginWarmup'>,
-): WarmupFlowState {
+): MissionFlowState {
   if (
     state.lifecycle.phase !== 'preMission' ||
     state.telemetryStatus.state !== 'connected'
@@ -474,7 +474,7 @@ function handleWarmupStart(
   }
 }
 
-function handleBackToBriefing(state: WarmupFlowState): WarmupFlowState {
+function handleBackToBriefing(state: MissionFlowState): MissionFlowState {
   const lifecycle = state.lifecycle
   const runId = runIdFor(lifecycle)
   return runId === null
@@ -487,9 +487,9 @@ function handleBackToBriefing(state: WarmupFlowState): WarmupFlowState {
 }
 
 function handleManualPause(
-  state: WarmupFlowState,
+  state: MissionFlowState,
   fact: FactOf<'manualPause'>,
-): WarmupFlowState {
+): MissionFlowState {
   const run = liveRun(state.lifecycle)
   if (run === null || state.lifecycle.phase !== 'activeMission') return state
   const runId = state.lifecycle.runId
@@ -545,9 +545,9 @@ function handleManualPause(
 }
 
 function handleManualResume(
-  state: WarmupFlowState,
+  state: MissionFlowState,
   fact: FactOf<'manualResume'>,
-): WarmupFlowState {
+): MissionFlowState {
   const run = liveRun(state.lifecycle)
   if (
     run === null ||
@@ -579,9 +579,9 @@ function handleManualResume(
 }
 
 function handlePuzzleRotation(
-  state: WarmupFlowState,
+  state: MissionFlowState,
   fact: FactOf<'puzzleTileRotated'>,
-): WarmupFlowState {
+): MissionFlowState {
   const run = liveRun(state.lifecycle)
   if (run === null || state.lifecycle.phase !== 'activeMission') return state
   let advanced = advanceActiveRunSignalAuthority(
@@ -646,9 +646,9 @@ function handlePuzzleRotation(
 }
 
 function handlePuzzleHintRequest(
-  state: WarmupFlowState,
+  state: MissionFlowState,
   fact: FactOf<'puzzleHintRequested'>,
-): WarmupFlowState {
+): MissionFlowState {
   const run = liveRun(state.lifecycle)
   if (run === null || state.lifecycle.phase !== 'activeMission') return state
   let advanced = advanceActiveRunSignalAuthority(
@@ -683,9 +683,9 @@ function handlePuzzleHintRequest(
 }
 
 function handlePuzzleReset(
-  state: WarmupFlowState,
+  state: MissionFlowState,
   fact: FactOf<'puzzleReset'>,
-): WarmupFlowState {
+): MissionFlowState {
   const run = liveRun(state.lifecycle)
   if (run === null || state.lifecycle.phase !== 'activeMission') return state
   let advanced = advanceActiveRunSignalAuthority(
@@ -724,9 +724,9 @@ function handlePuzzleReset(
 }
 
 function handleTelemetryStatus(
-  state: WarmupFlowState,
+  state: MissionFlowState,
   fact: FactOf<'status'>,
-): WarmupFlowState {
+): MissionFlowState {
   let lifecycle = state.lifecycle
   const session = liveSession(lifecycle)
   if (session !== null && fact.status.state !== 'connected') {
@@ -790,9 +790,9 @@ function handleTelemetryStatus(
 }
 
 function handleSample(
-  state: WarmupFlowState,
+  state: MissionFlowState,
   fact: FactOf<'sample'>,
-): WarmupFlowState {
+): MissionFlowState {
   const { bpm, occurrenceTimeMs } = fact.sample
   const valid =
     isValidHeartRateBpm(bpm) &&
@@ -873,9 +873,9 @@ function handleSample(
 }
 
 function handleVisibilityChange(
-  state: WarmupFlowState,
+  state: MissionFlowState,
   fact: FactOf<'visibility'>,
-): WarmupFlowState {
+): MissionFlowState {
   const session = liveSession(state.lifecycle)
   if (session === null) return state
   let lifecycle = state.lifecycle
@@ -934,9 +934,9 @@ function handleVisibilityChange(
 }
 
 function handleTimeAdvance(
-  state: WarmupFlowState,
+  state: MissionFlowState,
   fact: FactOf<'timeAdvanced'>,
-): WarmupFlowState {
+): MissionFlowState {
   const run = liveRun(state.lifecycle)
   if (run !== null) {
     if (state.lifecycle.phase !== 'activeMission') return state
@@ -997,10 +997,10 @@ function assertNeverFact(fact: never): never {
   throw new Error(`Unhandled flow fact: ${String(fact)}`)
 }
 
-function reduceWarmupFlow(
-  state: WarmupFlowState,
-  fact: WarmupFlowFact,
-): WarmupFlowState {
+function reduceMissionFlow(
+  state: MissionFlowState,
+  fact: MissionFlowFact,
+): MissionFlowState {
   if (fact.type === 'resetDiagnostics') return state
   if (
     fact.type === 'timeAdvanced' &&
@@ -1044,14 +1044,14 @@ function reduceWarmupFlow(
 
 const DIAGNOSTIC_LOG_LIMIT = 1_000
 
-function factOccurrenceTime(fact: WarmupFlowFact): number {
+function factOccurrenceTime(fact: MissionFlowFact): number {
   return fact.type === 'sample' ? fact.sample.occurrenceTimeMs : fact.occurredAt
 }
 
-export function warmupFlowReducer(
-  state: WarmupFlowState,
-  fact: WarmupFlowFact,
-): WarmupFlowState {
+export function missionFlowReducer(
+  state: MissionFlowState,
+  fact: MissionFlowFact,
+): MissionFlowState {
   const occurrenceTime = factOccurrenceTime(fact)
   const ignoredOutOfOrder =
     fact.sequence <= state.lastAppliedSequence ||
@@ -1067,7 +1067,7 @@ export function warmupFlowReducer(
       lastAppliedSequence: fact.sequence,
     }
   }
-  const reduced = ignoredOutOfOrder ? state : reduceWarmupFlow(state, fact)
+  const reduced = ignoredOutOfOrder ? state : reduceMissionFlow(state, fact)
   const next = ignoredOutOfOrder
     ? reduced
     : {
@@ -1091,7 +1091,7 @@ export function warmupFlowReducer(
   return diagnosticPatch === null ? next : { ...next, ...diagnosticPatch }
 }
 
-export function canBeginWarmup(state: WarmupFlowState): boolean {
+export function canBeginWarmup(state: MissionFlowState): boolean {
   return (
     state.lifecycle.phase === 'preMission' &&
     state.telemetryStatus.state === 'connected' &&

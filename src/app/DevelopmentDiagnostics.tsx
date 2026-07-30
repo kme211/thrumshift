@@ -5,7 +5,7 @@ import {
   type ContinuousEmissionState,
   type SimulatedHeartRateSource,
 } from '../telemetry/simulated/SimulatedHeartRateSource'
-import type { WarmupFlowState } from './WarmupFlowController'
+import type { MissionFlowState } from './MissionFlowController'
 import { downloadDiagnosticLog } from './diagnosticExport'
 
 export function DevelopmentDiagnostics({
@@ -14,7 +14,7 @@ export function DevelopmentDiagnostics({
   onResetDiagnostics,
 }: {
   readonly simulatedSource: SimulatedHeartRateSource
-  readonly state: WarmupFlowState
+  readonly state: MissionFlowState
   readonly onResetDiagnostics: () => void
 }) {
   const [emission, setEmission] = useState<ContinuousEmissionState>(() =>

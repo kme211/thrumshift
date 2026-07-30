@@ -5,9 +5,9 @@ import {
   getWarmupProgressMs,
 } from '../domain/mission/warmup'
 import type {
-  WarmupFlowState,
-  WarmupTelemetryDiagnosticEntry,
-} from './WarmupFlowController'
+  MissionFlowState,
+  FlowDiagnosticEntry,
+} from './MissionFlowController'
 import { getWarmupDiagnosticSession } from './FlowDiagnostics'
 
 export interface DiagnosticEnvironment {
@@ -35,11 +35,11 @@ export interface DiagnosticLogExport {
     readonly warmupProgressMs: number
     readonly countdownRemainingMs: number | null
   }
-  readonly events: readonly WarmupTelemetryDiagnosticEntry[]
+  readonly events: readonly FlowDiagnosticEntry[]
 }
 
 export function createDiagnosticLogExport(
-  state: WarmupFlowState,
+  state: MissionFlowState,
   environment: DiagnosticEnvironment,
   exportedAt = new Date().toISOString(),
 ): DiagnosticLogExport {
@@ -85,7 +85,7 @@ export function serializeDiagnosticLog(
 }
 
 export function downloadDiagnosticLog(
-  state: WarmupFlowState,
+  state: MissionFlowState,
   environment: DiagnosticEnvironment,
 ): void {
   const url = URL.createObjectURL(

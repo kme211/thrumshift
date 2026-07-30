@@ -4,11 +4,11 @@ import type {
 } from '../domain/heart-rate/classifier'
 import { isValidHeartRateBpm } from '../domain/heart-rate/range'
 import { getWarmupProgressMs } from '../domain/mission/warmup'
-import type { WarmupFlowFact, WarmupFlowState } from './WarmupFlowController'
+import type { MissionFlowFact, MissionFlowState } from './MissionFlowController'
 import type { MissionRun } from './MissionRun'
 import type { WarmupSession } from './WarmupSession'
 
-export interface WarmupTelemetryDiagnosticEntry {
+export interface FlowDiagnosticEntry {
   readonly sequence: number
   readonly occurrenceTimeMs: number
   readonly category: string
@@ -31,7 +31,7 @@ export interface FlowDiagnosticState {
 }
 
 export interface FlowDiagnosticPatch {
-  readonly diagnosticLog: readonly WarmupTelemetryDiagnosticEntry[]
+  readonly diagnosticLog: readonly FlowDiagnosticEntry[]
   readonly diagnosticSessionStartMs: number
   readonly diagnosticLastOccurrenceMs: number
 }
@@ -50,7 +50,7 @@ interface PendingDiagnosticEvent {
 }
 
 export function getWarmupDiagnosticSession(
-  state: WarmupFlowState,
+  state: MissionFlowState,
 ): WarmupSession | null {
   const { lifecycle } = state
   if (lifecycle.phase === 'warming' || lifecycle.phase === 'countdown') {
@@ -65,7 +65,7 @@ export function getWarmupDiagnosticSession(
   return null
 }
 
-function liveRun(state: WarmupFlowState): MissionRun | null {
+function liveRun(state: MissionFlowState): MissionRun | null {
   const { lifecycle } = state
   if (lifecycle.phase === 'activeMission') return lifecycle.mission
   if (
@@ -78,7 +78,7 @@ function liveRun(state: WarmupFlowState): MissionRun | null {
 }
 
 export function getFlowDiagnosticState(
-  state: WarmupFlowState,
+  state: MissionFlowState,
   tuning: FlowDiagnosticTuning,
 ): FlowDiagnosticState {
   const session = getWarmupDiagnosticSession(state)
@@ -114,9 +114,9 @@ function getDiagnosticEvents({
   ignoredOutOfOrder,
   tuning,
 }: {
-  readonly before: WarmupFlowState
-  readonly fact: WarmupFlowFact
-  readonly after: WarmupFlowState
+  readonly before: MissionFlowState
+  readonly fact: MissionFlowFact
+  readonly after: MissionFlowState
   readonly occurrenceTime: number
   readonly ignoredOutOfOrder: boolean
   readonly tuning: FlowDiagnosticTuning
@@ -247,9 +247,9 @@ export function appendFlowDiagnostics({
   tuning,
   limit,
 }: {
-  readonly before: WarmupFlowState
-  readonly fact: WarmupFlowFact
-  readonly after: WarmupFlowState
+  readonly before: MissionFlowState
+  readonly fact: MissionFlowFact
+  readonly after: MissionFlowState
   readonly occurrenceTime: number
   readonly ignoredOutOfOrder: boolean
   readonly tuning: FlowDiagnosticTuning
@@ -274,7 +274,7 @@ export function appendFlowDiagnostics({
     (before.diagnosticLog[before.diagnosticLog.length - 1]?.sequence ?? 0) + 1
   const afterState = getFlowDiagnosticState(after, tuning)
   const entries = pendingEvents.map(
-    ({ category, details = {} }, index): WarmupTelemetryDiagnosticEntry => ({
+    ({ category, details = {} }, index): FlowDiagnosticEntry => ({
       sequence: firstSequence + index,
       occurrenceTimeMs: Math.max(0, loggedOccurrenceTime - sessionStart),
       category,

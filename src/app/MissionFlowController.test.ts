@@ -2,65 +2,67 @@ import { describe, expect, it } from 'vitest'
 
 import type { HeartRateSample } from '../domain/heart-rate/types'
 import {
-  createWarmupFlowState,
-  warmupFlowReducer,
-} from './WarmupFlowController'
+  createMissionFlowState,
+  missionFlowReducer,
+} from './MissionFlowController'
 import type {
-  WarmupFlowFactPayload,
-  WarmupFlowState,
-} from './WarmupFlowController'
+  MissionFlowFactPayload,
+  MissionFlowState,
+} from './MissionFlowController'
 
 const source = { id: 'test', type: 'simulated' } as const
-const sample = (time: number, bpm: number): WarmupFlowFactPayload => ({
+const sample = (time: number, bpm: number): MissionFlowFactPayload => ({
   type: 'sample',
   sample: { occurrenceTimeMs: time, bpm, source } satisfies HeartRateSample,
 })
 
-function run(facts: readonly WarmupFlowFactPayload[]): WarmupFlowState {
-  return runFrom(createWarmupFlowState(), facts)
+function run(facts: readonly MissionFlowFactPayload[]): MissionFlowState {
+  return runFrom(createMissionFlowState(), facts)
 }
 
 function apply(
-  state: WarmupFlowState,
-  fact: WarmupFlowFactPayload,
+  state: MissionFlowState,
+  fact: MissionFlowFactPayload,
   sequence = state.lastAppliedSequence + 1,
-): WarmupFlowState {
-  return warmupFlowReducer(state, { ...fact, sequence })
+): MissionFlowState {
+  return missionFlowReducer(state, { ...fact, sequence })
 }
 
 function runFrom(
-  initial: WarmupFlowState,
-  facts: readonly WarmupFlowFactPayload[],
-): WarmupFlowState {
+  initial: MissionFlowState,
+  facts: readonly MissionFlowFactPayload[],
+): MissionFlowState {
   let state = initial
   for (const fact of facts) state = apply(state, fact)
   return state
 }
 
-const connected = (time = 0): WarmupFlowFactPayload => ({
+const connected = (time = 0): MissionFlowFactPayload => ({
   type: 'status',
   occurredAt: time,
   status: { state: 'connected' },
 })
-const begin = (time = 0): WarmupFlowFactPayload => ({
+const begin = (time = 0): MissionFlowFactPayload => ({
   type: 'beginWarmup',
   occurredAt: time,
 })
-const advance = (time: number): WarmupFlowFactPayload => ({
+const advance = (time: number): MissionFlowFactPayload => ({
   type: 'timeAdvanced',
   occurredAt: time,
   runGeneration: 1,
 })
 
-function sustainedOperationalSamples(endTime: number): WarmupFlowFactPayload[] {
-  const facts: WarmupFlowFactPayload[] = [sample(0, 110), sample(500, 110)]
+function sustainedOperationalSamples(
+  endTime: number,
+): MissionFlowFactPayload[] {
+  const facts: MissionFlowFactPayload[] = [sample(0, 110), sample(500, 110)]
   for (let time = 1_000; time <= endTime; time += 1_000) {
     facts.push(sample(time, 110))
   }
   return facts
 }
 
-function enterActiveMission(): WarmupFlowState {
+function enterActiveMission(): MissionFlowState {
   return run([
     connected(),
     begin(),
@@ -72,7 +74,7 @@ function enterActiveMission(): WarmupFlowState {
 function activeMissionWithFreshSamples(
   bpm: number,
   endTime = 22_000,
-): WarmupFlowState {
+): MissionFlowState {
   let state = enterActiveMission()
   for (let time = 17_000; time <= endTime; time += 1_000) {
     state = apply(state, sample(time, bpm))
@@ -80,9 +82,9 @@ function activeMissionWithFreshSamples(
   return state
 }
 
-describe('warm-up flow controller', () => {
+describe('mission flow controller', () => {
   it('records sanitized events with relative monotonic time and sequence order', () => {
-    let state = createWarmupFlowState(true)
+    let state = createMissionFlowState(true)
     state = apply(state, connected(10))
     state = apply(state, begin(20))
     state = apply(state, {
@@ -127,7 +129,7 @@ describe('warm-up flow controller', () => {
   })
 
   it('bounds diagnostics to the latest 1,000 events', () => {
-    let state = createWarmupFlowState(true)
+    let state = createMissionFlowState(true)
     for (let index = 0; index < 1_005; index += 1) {
       state = apply(state, connected(index))
     }
@@ -137,7 +139,7 @@ describe('warm-up flow controller', () => {
   })
 
   it('resetting diagnostics clears the prior session and restarts relative time', () => {
-    let state = createWarmupFlowState(true)
+    let state = createMissionFlowState(true)
     state = apply(state, connected(100))
     state = apply(state, {
       type: 'resetDiagnostics',
@@ -157,7 +159,7 @@ describe('warm-up flow controller', () => {
   })
 
   it('uses the diagnostics-disabled fast path without allocating log entries', () => {
-    const state = createWarmupFlowState(false)
+    const state = createMissionFlowState(false)
     const log = state.diagnosticLog
     const next = apply(state, connected(10))
     expect(next.diagnosticLog).toBe(log)
@@ -167,8 +169,8 @@ describe('warm-up flow controller', () => {
 
   it('does not let diagnostic recording change canonical application state', () => {
     const facts = [connected(), begin(), sample(0, 110), advance(100)]
-    const disabled = runFrom(createWarmupFlowState(false), facts)
-    const enabled = runFrom(createWarmupFlowState(true), facts)
+    const disabled = runFrom(createMissionFlowState(false), facts)
+    const enabled = runFrom(createMissionFlowState(true), facts)
     expect({
       lifecycle: enabled.lifecycle,
       targetRange: enabled.targetRange,
@@ -192,7 +194,7 @@ describe('warm-up flow controller', () => {
 
   it('uses the same status/sample facts regardless of source identity', () => {
     const simulated = run([connected(), begin(), sample(0, 110)])
-    const bluetoothSample: WarmupFlowFactPayload = {
+    const bluetoothSample: MissionFlowFactPayload = {
       type: 'sample',
       sample: {
         occurrenceTimeMs: 0,
@@ -827,7 +829,7 @@ describe('warm-up flow controller', () => {
   })
 
   it('ignores stale scheduler completion from an earlier run generation', () => {
-    const state = runFrom(createWarmupFlowState(true), [
+    const state = runFrom(createMissionFlowState(true), [
       connected(),
       begin(),
       ...sustainedOperationalSamples(13_000),
@@ -876,7 +878,7 @@ describe('warm-up flow controller', () => {
   })
 
   it('uses explicit target-range invalidation while retaining latest BPM', () => {
-    let state = runFrom(createWarmupFlowState(true), [
+    let state = runFrom(createMissionFlowState(true), [
       connected(),
       begin(),
       sample(100, 110),
@@ -947,7 +949,7 @@ describe('warm-up flow controller', () => {
   })
 
   it('rejects out-of-order facts and preserves monotonic diagnostics', () => {
-    let state = createWarmupFlowState(true)
+    let state = createMissionFlowState(true)
     state = apply(state, connected(100), 1)
     state = apply(
       state,
@@ -974,7 +976,7 @@ describe('warm-up flow controller', () => {
   })
 
   it('accepts equal-time facts in increasing sequence order', () => {
-    let state = createWarmupFlowState(true)
+    let state = createMissionFlowState(true)
     state = apply(state, connected(100), 1)
     state = apply(
       state,
@@ -1029,7 +1031,7 @@ describe('warm-up flow controller', () => {
     ['product minimum', '39', '140'],
     ['product maximum', '100', '221'],
   ])('rejects invalid target range: %s', (_name, lower, upper) => {
-    let state = createWarmupFlowState()
+    let state = createMissionFlowState()
     state = apply(state, {
       type: 'targetDraftChanged',
       occurredAt: 0,
@@ -1050,7 +1052,7 @@ describe('warm-up flow controller', () => {
   })
 
   it('accepts the exact product target boundaries', () => {
-    let state = createWarmupFlowState()
+    let state = createMissionFlowState()
     state = apply(state, {
       type: 'targetDraftChanged',
       occurredAt: 0,

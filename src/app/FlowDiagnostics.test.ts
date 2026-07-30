@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  createWarmupFlowState,
-  warmupFlowReducer,
-} from './WarmupFlowController'
-import type { WarmupFlowFact, WarmupFlowState } from './WarmupFlowController'
+  createMissionFlowState,
+  missionFlowReducer,
+} from './MissionFlowController'
+import type { MissionFlowFact, MissionFlowState } from './MissionFlowController'
 import { appendFlowDiagnostics } from './FlowDiagnostics'
-import type { WarmupTelemetryDiagnosticEntry } from './FlowDiagnostics'
+import type { FlowDiagnosticEntry } from './FlowDiagnostics'
 
-function connectedFact(occurredAt: number, sequence: number): WarmupFlowFact {
+function connectedFact(occurredAt: number, sequence: number): MissionFlowFact {
   return {
     type: 'status',
     occurredAt,
@@ -19,9 +19,9 @@ function connectedFact(occurredAt: number, sequence: number): WarmupFlowFact {
 
 describe('flow diagnostics', () => {
   it('derives the same sanitized patch without mutating either state', () => {
-    const before = createWarmupFlowState(false)
+    const before = createMissionFlowState(false)
     const fact = connectedFact(100, 1)
-    const after = warmupFlowReducer(before, fact)
+    const after = missionFlowReducer(before, fact)
     const beforeSnapshot = structuredClone(before)
     const afterSnapshot = structuredClone(after)
 
@@ -60,8 +60,8 @@ describe('flow diagnostics', () => {
   })
 
   it('sanitizes ignored out-of-order facts and preserves monotonic ordering', () => {
-    const initial = createWarmupFlowState(false)
-    const before: WarmupFlowState = {
+    const initial = createMissionFlowState(false)
+    const before: MissionFlowState = {
       ...initial,
       lastAppliedOccurrenceTimeMs: 200,
       lastAppliedSequence: 2,
@@ -81,7 +81,7 @@ describe('flow diagnostics', () => {
         },
       ],
     }
-    const fact: WarmupFlowFact = {
+    const fact: MissionFlowFact = {
       type: 'sample',
       sequence: 3,
       sample: {
@@ -120,7 +120,7 @@ describe('flow diagnostics', () => {
   })
 
   it('keeps only the configured diagnostic-history tail', () => {
-    const existing: WarmupTelemetryDiagnosticEntry[] = Array.from(
+    const existing: FlowDiagnosticEntry[] = Array.from(
       { length: 3 },
       (_, index) => ({
         sequence: index + 1,
@@ -134,8 +134,8 @@ describe('flow diagnostics', () => {
         stableClassification: null,
       }),
     )
-    const initial = createWarmupFlowState(false)
-    const before: WarmupFlowState = {
+    const initial = createMissionFlowState(false)
+    const before: MissionFlowState = {
       ...initial,
       diagnosticLog: existing,
       diagnosticSessionStartMs: 0,
@@ -146,7 +146,7 @@ describe('flow diagnostics', () => {
     const patch = appendFlowDiagnostics({
       before,
       fact,
-      after: warmupFlowReducer(before, fact),
+      after: missionFlowReducer(before, fact),
       occurrenceTime: 3,
       ignoredOutOfOrder: false,
       tuning: {

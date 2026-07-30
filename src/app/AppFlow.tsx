@@ -21,10 +21,10 @@ import type { WebBluetoothHeartRateSource } from '../telemetry/bluetooth/WebBlue
 import type { SimulatedHeartRateSource } from '../telemetry/simulated/SimulatedHeartRateSource'
 import {
   canBeginWarmup,
-  createWarmupFlowState,
-  warmupFlowReducer,
-} from './WarmupFlowController'
-import type { WarmupFlowFactPayload } from './WarmupFlowController'
+  createMissionFlowState,
+  missionFlowReducer,
+} from './MissionFlowController'
+import type { MissionFlowFactPayload } from './MissionFlowController'
 import { getMissionHintEligibility } from './MissionRun'
 
 const DevelopmentDiagnostics = import.meta.env.DEV
@@ -57,13 +57,13 @@ export function AppFlow({
   simulatedSource,
 }: AppFlowProps) {
   const [state, dispatch] = useReducer(
-    warmupFlowReducer,
+    missionFlowReducer,
     import.meta.env.DEV,
-    createWarmupFlowState,
+    createMissionFlowState,
   )
   const nextFactSequence = useRef(0)
   const dispatchFact = useCallback(
-    (fact: WarmupFlowFactPayload) =>
+    (fact: MissionFlowFactPayload) =>
       dispatch({ ...fact, sequence: ++nextFactSequence.current }),
     [],
   )

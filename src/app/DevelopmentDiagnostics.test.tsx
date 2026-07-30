@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from 'vitest'
 import type { MonotonicClock } from '../platform/Clock'
 import { SimulatedHeartRateSource } from '../telemetry/simulated/SimulatedHeartRateSource'
 import {
-  createWarmupFlowState,
-  warmupFlowReducer,
-} from './WarmupFlowController'
+  createMissionFlowState,
+  missionFlowReducer,
+} from './MissionFlowController'
 import {
   createDiagnosticLogExport,
   serializeDiagnosticLog,
@@ -15,8 +15,8 @@ import { DevelopmentDiagnostics } from './DevelopmentDiagnostics'
 
 describe('development diagnostic export', () => {
   it('exports serializable schema-versioned environment, configuration, state, and events', () => {
-    let state = createWarmupFlowState(true)
-    state = warmupFlowReducer(state, {
+    let state = createMissionFlowState(true)
+    state = missionFlowReducer(state, {
       type: 'status',
       occurredAt: 42,
       sequence: 1,
@@ -64,7 +64,7 @@ describe('DevelopmentDiagnostics', () => {
     render(
       <DevelopmentDiagnostics
         simulatedSource={new SimulatedHeartRateSource(clock)}
-        state={createWarmupFlowState(true)}
+        state={createMissionFlowState(true)}
         onResetDiagnostics={vi.fn()}
       />,
     )
@@ -87,7 +87,7 @@ describe('DevelopmentDiagnostics', () => {
     const view = render(
       <DevelopmentDiagnostics
         simulatedSource={source}
-        state={createWarmupFlowState(true)}
+        state={createMissionFlowState(true)}
         onResetDiagnostics={vi.fn()}
       />,
     )

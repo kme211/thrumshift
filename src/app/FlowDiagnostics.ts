@@ -202,12 +202,16 @@ function getDiagnosticEvents({
       details: { state: fact.state },
     })
   } else if (
-    fact.type === 'timeAdvanced' &&
+    'runGeneration' in fact &&
     fact.runGeneration !== before.runGeneration
   ) {
     events.push({
-      category: 'ignoredStaleGenerationCallback',
+      category:
+        fact.type === 'timeAdvanced'
+          ? 'ignoredStaleGenerationCallback'
+          : 'ignoredStaleRunIntent',
       details: {
+        factType: fact.type,
         callbackGeneration: fact.runGeneration,
         currentGeneration: before.runGeneration,
       },
@@ -261,6 +265,29 @@ function getDiagnosticEvents({
     after.lifecycle.phase === 'activeMission'
   ) {
     events.push({ category: 'countdownCompleted' })
+  }
+  if (
+    before.lifecycle.phase !== 'result' &&
+    after.lifecycle.phase === 'result'
+  ) {
+    events.push({
+      category: 'resultEntered',
+      details: { outcome: after.lifecycle.result.outcome },
+    })
+  }
+  if (
+    fact.type === 'runAgain' &&
+    before.lifecycle.phase === 'result' &&
+    after.lifecycle.phase === 'preMission'
+  ) {
+    events.push({ category: 'runAgainAccepted' })
+    events.push({
+      category: 'runGenerationEstablished',
+      details: {
+        previousGeneration: before.runGeneration,
+        currentGeneration: after.runGeneration,
+      },
+    })
   }
   if (before.lifecycle.phase !== after.lifecycle.phase) {
     events.push({

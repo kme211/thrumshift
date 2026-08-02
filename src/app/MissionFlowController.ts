@@ -106,16 +106,42 @@ export type MissionFlowFactPayload =
       readonly source?: HeartRateSourceIdentity
       readonly sourceGeneration?: number
     }
-  | { readonly type: 'backToBriefing'; readonly occurredAt: number }
+  | {
+      readonly type: 'backToBriefing'
+      readonly occurredAt: number
+      readonly runGeneration: number
+    }
+  | {
+      readonly type: 'runAgain'
+      readonly occurredAt: number
+      readonly runGeneration: number
+    }
   | {
       readonly type: 'puzzleTileRotated'
       readonly occurredAt: number
+      readonly runGeneration: number
       readonly tileId: string
     }
-  | { readonly type: 'puzzleHintRequested'; readonly occurredAt: number }
-  | { readonly type: 'puzzleReset'; readonly occurredAt: number }
-  | { readonly type: 'manualPause'; readonly occurredAt: number }
-  | { readonly type: 'manualResume'; readonly occurredAt: number }
+  | {
+      readonly type: 'puzzleHintRequested'
+      readonly occurredAt: number
+      readonly runGeneration: number
+    }
+  | {
+      readonly type: 'puzzleReset'
+      readonly occurredAt: number
+      readonly runGeneration: number
+    }
+  | {
+      readonly type: 'manualPause'
+      readonly occurredAt: number
+      readonly runGeneration: number
+    }
+  | {
+      readonly type: 'manualResume'
+      readonly occurredAt: number
+      readonly runGeneration: number
+    }
   | { readonly type: 'resetDiagnostics'; readonly occurredAt: number }
 
 export type MissionFlowFact = MissionFlowFactPayload & {
@@ -587,6 +613,21 @@ function handleBackToBriefing(state: MissionFlowState): MissionFlowState {
         lifecycle: appReducer(lifecycle, { type: 'runAbandoned', runId }),
         announcement: 'Returned to mission briefing',
       }
+}
+
+function handleRunAgain(state: MissionFlowState): MissionFlowState {
+  if (state.lifecycle.phase !== 'result') return state
+  const lifecycle = appReducer<WarmupSession, MissionRun, MissionResult>(
+    state.lifecycle,
+    { type: 'runAgain' },
+  )
+  if (lifecycle === state.lifecycle) return state
+  return {
+    ...state,
+    lifecycle,
+    runGeneration: state.runGeneration + 1,
+    announcement: 'Ready for another mission.',
+  }
 }
 
 function handleManualPause(
@@ -1442,10 +1483,7 @@ function reduceMissionFlow(
   fact: MissionFlowFact,
 ): MissionFlowState {
   if (fact.type === 'resetDiagnostics') return state
-  if (
-    fact.type === 'timeAdvanced' &&
-    fact.runGeneration !== state.runGeneration
-  ) {
+  if ('runGeneration' in fact && fact.runGeneration !== state.runGeneration) {
     return state
   }
   if (
@@ -1472,6 +1510,8 @@ function reduceMissionFlow(
       return handleWarmupStart(state, fact)
     case 'backToBriefing':
       return handleBackToBriefing(state)
+    case 'runAgain':
+      return handleRunAgain(state)
     case 'manualPause':
       return handleManualPause(state, fact)
     case 'manualResume':

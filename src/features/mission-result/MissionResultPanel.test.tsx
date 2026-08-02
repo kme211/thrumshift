@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   buildFailedMissionResult,
@@ -10,7 +11,9 @@ import { MissionResultPanel } from './MissionResultPanel'
 
 describe('MissionResultPanel', () => {
   it('renders a successful result in logical semantic order', () => {
-    const view = render(<MissionResultPanel result={buildMissionResult()} />)
+    const view = render(
+      <MissionResultPanel result={buildMissionResult()} onRunAgain={vi.fn()} />,
+    )
     const heading = screen.getByRole('heading', {
       level: 1,
       name: 'Mission successful',
@@ -43,7 +46,12 @@ describe('MissionResultPanel', () => {
   })
 
   it('renders failure in text without completion-time language', () => {
-    render(<MissionResultPanel result={buildFailedMissionResult()} />)
+    render(
+      <MissionResultPanel
+        result={buildFailedMissionResult()}
+        onRunAgain={vi.fn()}
+      />,
+    )
     expect(
       screen.getByRole('heading', { level: 1, name: 'Mission failed' }),
     ).toHaveFocus()
@@ -56,7 +64,12 @@ describe('MissionResultPanel', () => {
   })
 
   it('visibly explains sparse signal and suppresses unsupported claims', () => {
-    render(<MissionResultPanel result={buildSparseMissionResult()} />)
+    render(
+      <MissionResultPanel
+        result={buildSparseMissionResult()}
+        onRunAgain={vi.fn()}
+      />,
+    )
     expect(
       screen.getByText(/usable signal data was insufficient/i),
     ).toBeVisible()
@@ -114,7 +127,12 @@ describe('MissionResultPanel', () => {
   ])(
     'renders independent signal availability when $name',
     ({ override, averageVisible, rangeVisible, explanation, rating }) => {
-      render(<MissionResultPanel result={buildMissionResult(override)} />)
+      render(
+        <MissionResultPanel
+          result={buildMissionResult(override)}
+          onRunAgain={vi.fn()}
+        />,
+      )
       expect(screen.queryByText('Average heart rate') !== null).toBe(
         averageVisible,
       )
@@ -132,8 +150,27 @@ describe('MissionResultPanel', () => {
     },
   )
 
+  it('focuses once, does not steal focus on an unchanged rerender, and invokes Run Again by keyboard', async () => {
+    const user = userEvent.setup()
+    const onRunAgain = vi.fn()
+    const result = buildMissionResult()
+    const view = render(
+      <MissionResultPanel result={result} onRunAgain={onRunAgain} />,
+    )
+    const button = screen.getByRole('button', { name: 'Run Again' })
+    button.focus()
+    view.rerender(
+      <MissionResultPanel result={result} onRunAgain={onRunAgain} />,
+    )
+    expect(button).toHaveFocus()
+    await user.keyboard('{Enter}')
+    expect(onRunAgain).toHaveBeenCalledTimes(1)
+  })
+
   it('uses a single-column base structure with wrapping-safe metric cells', () => {
-    const view = render(<MissionResultPanel result={buildMissionResult()} />)
+    const view = render(
+      <MissionResultPanel result={buildMissionResult()} onRunAgain={vi.fn()} />,
+    )
     expect(view.container.querySelectorAll('.min-w-0').length).toBeGreaterThan(
       0,
     )

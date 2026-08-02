@@ -5,6 +5,7 @@ import { createMissionResultViewModel } from './missionResultViewModel'
 
 interface MissionResultPanelProps {
   readonly result: MissionResult
+  readonly onRunAgain: () => void
 }
 
 function MetricList({
@@ -40,7 +41,10 @@ function MetricList({
   )
 }
 
-export function MissionResultPanel({ result }: MissionResultPanelProps) {
+export function MissionResultPanel({
+  result,
+  onRunAgain,
+}: MissionResultPanelProps) {
   const headingRef = useRef<HTMLHeadingElement>(null)
   const view = createMissionResultViewModel(result)
 
@@ -146,6 +150,14 @@ export function MissionResultPanel({ result }: MissionResultPanelProps) {
             {view.rating.criteria}
           </p>
         </section>
+
+        <button
+          className="mt-8 w-full text-lg font-semibold"
+          type="button"
+          onClick={onRunAgain}
+        >
+          Run Again
+        </button>
       </div>
     </section>
   )

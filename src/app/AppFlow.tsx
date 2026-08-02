@@ -211,7 +211,11 @@ export function AppFlow({
         {...targetProps}
         onConnect={() => void source.connect()}
         onBack={() =>
-          dispatchFact({ type: 'backToBriefing', occurredAt: clock.now() })
+          dispatchFact({
+            type: 'backToBriefing',
+            occurredAt: clock.now(),
+            runGeneration: state.runGeneration,
+          })
         }
       />
     )
@@ -244,29 +248,61 @@ export function AppFlow({
           dispatchFact({
             type: 'puzzleTileRotated',
             occurredAt: clock.now(),
+            runGeneration: state.runGeneration,
             tileId,
           })
         }
         onHint={() =>
-          dispatchFact({ type: 'puzzleHintRequested', occurredAt: clock.now() })
+          dispatchFact({
+            type: 'puzzleHintRequested',
+            occurredAt: clock.now(),
+            runGeneration: state.runGeneration,
+          })
         }
         onReset={() =>
-          dispatchFact({ type: 'puzzleReset', occurredAt: clock.now() })
+          dispatchFact({
+            type: 'puzzleReset',
+            occurredAt: clock.now(),
+            runGeneration: state.runGeneration,
+          })
         }
         onPause={() =>
-          dispatchFact({ type: 'manualPause', occurredAt: clock.now() })
+          dispatchFact({
+            type: 'manualPause',
+            occurredAt: clock.now(),
+            runGeneration: state.runGeneration,
+          })
         }
         onResume={() =>
-          dispatchFact({ type: 'manualResume', occurredAt: clock.now() })
+          dispatchFact({
+            type: 'manualResume',
+            occurredAt: clock.now(),
+            runGeneration: state.runGeneration,
+          })
         }
         onReconnect={() => void source.connect()}
         onEndRun={() =>
-          dispatchFact({ type: 'backToBriefing', occurredAt: clock.now() })
+          dispatchFact({
+            type: 'backToBriefing',
+            occurredAt: clock.now(),
+            runGeneration: state.runGeneration,
+          })
         }
       />
     )
   } else if (state.lifecycle.phase === 'result') {
-    screen = <MissionResultPanel result={state.lifecycle.result} />
+    screen = (
+      <MissionResultPanel
+        result={state.lifecycle.result}
+        onRunAgain={() =>
+          dispatchFact({
+            type: 'runAgain',
+            occurredAt: clock.now(),
+            runGeneration: state.runGeneration,
+          })
+        }
+      />
+    )
   } else {
     screen = (
       <LifecycleScreen
@@ -276,6 +312,7 @@ export function AppFlow({
           dispatchFact({
             type: 'backToBriefing',
             occurredAt: clock.now(),
+            runGeneration: state.runGeneration,
           })
         }
       />

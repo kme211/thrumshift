@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { HeartRateSample } from '../domain/heart-rate/types'
 import {
+  canBeginWarmup,
   createMissionFlowState,
   missionFlowReducer,
 } from './MissionFlowController'
@@ -11,64 +12,131 @@ import type {
 } from './MissionFlowController'
 
 const source = { id: 'test', type: 'simulated' } as const
-const sample = (time: number, bpm: number): MissionFlowFactPayload => ({
+type OptionalRunGeneration<Fact> = Fact extends {
+  readonly runGeneration: number
+}
+  ? Omit<Fact, 'runGeneration'> & { readonly runGeneration?: number }
+  : Fact
+type TestFact = OptionalRunGeneration<MissionFlowFactPayload>
+
+const RUN_SCOPED_FACT_TYPES = new Set([
+  'timeAdvanced',
+  'backToBriefing',
+  'runAgain',
+  'puzzleTileRotated',
+  'puzzleHintRequested',
+  'puzzleReset',
+  'manualPause',
+  'manualResume',
+])
+
+const sample = (time: number, bpm: number): TestFact => ({
   type: 'sample',
   sample: { occurrenceTimeMs: time, bpm, source } satisfies HeartRateSample,
 })
 
-function run(facts: readonly MissionFlowFactPayload[]): MissionFlowState {
+function run(facts: readonly TestFact[]): MissionFlowState {
   return runFrom(createMissionFlowState(), facts)
 }
 
 function apply(
   state: MissionFlowState,
-  fact: MissionFlowFactPayload,
+  fact: TestFact,
   sequence = state.lastAppliedSequence + 1,
 ): MissionFlowState {
-  return missionFlowReducer(state, { ...fact, sequence })
+  const boundFact =
+    RUN_SCOPED_FACT_TYPES.has(fact.type) && !('runGeneration' in fact)
+      ? { ...fact, runGeneration: state.runGeneration }
+      : fact
+  return missionFlowReducer(state, {
+    ...boundFact,
+    sequence,
+  } as Parameters<typeof missionFlowReducer>[1])
 }
 
 function runFrom(
   initial: MissionFlowState,
-  facts: readonly MissionFlowFactPayload[],
+  facts: readonly TestFact[],
 ): MissionFlowState {
   let state = initial
   for (const fact of facts) state = apply(state, fact)
   return state
 }
 
-const connected = (time = 0): MissionFlowFactPayload => ({
+const connected = (time = 0): TestFact => ({
   type: 'status',
   occurredAt: time,
   status: { state: 'connected' },
 })
-const begin = (time = 0): MissionFlowFactPayload => ({
+const begin = (time = 0): TestFact => ({
   type: 'beginWarmup',
   occurredAt: time,
 })
-const advance = (time: number): MissionFlowFactPayload => ({
+const advance = (time: number): TestFact => ({
   type: 'timeAdvanced',
   occurredAt: time,
   runGeneration: 1,
 })
 
-function sustainedOperationalSamples(
-  endTime: number,
-): MissionFlowFactPayload[] {
-  const facts: MissionFlowFactPayload[] = [sample(0, 110), sample(500, 110)]
+function sustainedOperationalSamples(endTime: number): TestFact[] {
+  const facts: TestFact[] = [sample(0, 110), sample(500, 110)]
   for (let time = 1_000; time <= endTime; time += 1_000) {
     facts.push(sample(time, 110))
   }
   return facts
 }
 
-function enterActiveMission(): MissionFlowState {
-  return run([
+function enterActiveMission(diagnosticsEnabled = false): MissionFlowState {
+  return runFrom(createMissionFlowState(diagnosticsEnabled), [
     connected(),
     begin(),
     ...sustainedOperationalSamples(13_000),
     advance(16_000),
   ])
+}
+
+function finishSuccessfulMission(
+  initial = enterActiveMission(),
+  startTime = 16_100,
+): MissionFlowState {
+  let state = initial
+  for (const [index, tileId] of [
+    'top-straight',
+    'middle-corner-left',
+    'bottom-straight',
+  ].entries()) {
+    state = apply(state, {
+      type: 'puzzleTileRotated',
+      occurredAt: startTime + index * 100,
+      tileId,
+    })
+  }
+  return state
+}
+
+function finishFailedMission(initial = enterActiveMission()): MissionFlowState {
+  let state = initial
+  for (let time = 17_000; time <= 55_000; time += 1_000) {
+    state = apply(state, sample(time, 170))
+  }
+  return state
+}
+
+function enterReplayedActiveMission(
+  initial: MissionFlowState,
+  startTime = 100_000,
+): MissionFlowState {
+  let state = apply(initial, { type: 'beginWarmup', occurredAt: startTime })
+  for (const offset of [
+    0, 500, 1_000, 2_000, 3_000, 4_000, 5_000, 6_000, 7_000, 8_000, 9_000,
+    10_000, 11_000, 12_000, 13_000,
+  ]) {
+    state = apply(state, sample(startTime + offset, 110))
+  }
+  return apply(state, {
+    type: 'timeAdvanced',
+    occurredAt: startTime + 16_000,
+  })
 }
 
 function activeMissionWithFreshSamples(
@@ -436,6 +504,370 @@ describe('mission flow controller', () => {
     })
     if (state.lifecycle.phase === 'result')
       expect(state.lifecycle.result).toBe(result)
+  })
+
+  it.each([
+    ['success', finishSuccessfulMission],
+    ['failure', finishFailedMission],
+  ] as const)(
+    'accepts Run Again once from a finalized %s result and establishes a new generation',
+    (_outcome, finalize) => {
+      let state = finalize()
+      expect(state.lifecycle.phase).toBe('result')
+      const finalizedResult =
+        state.lifecycle.phase === 'result' ? state.lifecycle.result : null
+      const priorGeneration = state.runGeneration
+
+      state = apply(state, { type: 'runAgain', occurredAt: 60_000 })
+
+      expect(state.lifecycle).toEqual({ phase: 'preMission' })
+      expect(state.runGeneration).toBe(priorGeneration + 1)
+      expect(state.announcement).toBe('Ready for another mission.')
+      expect(finalizedResult).not.toBeNull()
+      expect(Object.isFrozen(finalizedResult)).toBe(true)
+
+      const replayed = state
+      state = apply(state, { type: 'runAgain', occurredAt: 60_100 })
+      expect(state.lifecycle).toBe(replayed.lifecycle)
+      expect(state.runGeneration).toBe(replayed.runGeneration)
+    },
+  )
+
+  it('retains target range, selected source identity, and canonical connected status while resetting every run-owned value', () => {
+    let state = createMissionFlowState(true)
+    state = apply(state, {
+      type: 'sourceChanged',
+      occurredAt: 0,
+      source,
+      sourceGeneration: 4,
+    })
+    state = apply(state, connected(1))
+    state = apply(state, {
+      type: 'targetDraftChanged',
+      occurredAt: 2,
+      field: 'lower',
+      value: '105',
+    })
+    state = apply(state, {
+      type: 'targetDraftChanged',
+      occurredAt: 3,
+      field: 'upper',
+      value: '145',
+    })
+    state = apply(state, { type: 'targetCommitted', occurredAt: 4 })
+    state = apply(state, begin(5))
+    for (const fact of sustainedOperationalSamples(13_000).map((fact) =>
+      fact.type === 'sample'
+        ? {
+            ...fact,
+            sample: {
+              ...fact.sample,
+              occurrenceTimeMs: fact.sample.occurrenceTimeMs + 5,
+              bpm: 120,
+            },
+          }
+        : fact,
+    )) {
+      state = apply(state, fact)
+    }
+    state = apply(state, {
+      type: 'timeAdvanced',
+      occurredAt: 16_005,
+      runGeneration: 1,
+    })
+    state = finishSuccessfulMission(state, 16_100)
+    expect(state.lifecycle.phase).toBe('result')
+
+    state = apply(state, { type: 'runAgain', occurredAt: 17_000 })
+
+    expect(state.lifecycle).toEqual({ phase: 'preMission' })
+    expect(state.targetRange).toEqual({ lowerBpm: 105, upperBpm: 145 })
+    expect(state.targetDraft).toEqual({ lower: '105', upper: '145' })
+    expect(state.telemetrySourceIdentity).toEqual(source)
+    expect(state.telemetrySourceGeneration).toBe(4)
+    expect(state.telemetryStatus).toEqual({ state: 'connected' })
+
+    state = apply(state, { type: 'beginWarmup', occurredAt: 50_000 })
+    expect(state.lifecycle.phase).toBe('warming')
+    if (state.lifecycle.phase !== 'warming') return
+    expect(state.lifecycle.runId).toBe('run-3')
+    expect(state.lifecycle.warmup.targetRange).toEqual({
+      lowerBpm: 105,
+      upperBpm: 145,
+    })
+    expect(state.lifecycle.warmup.classifier).toMatchObject({
+      lastProcessedTimeMs: 50_000,
+      latestValidBpm: null,
+      filteredBpm: null,
+      signalQuality: 'insufficient',
+      stableClassification: null,
+      candidateClassification: null,
+      filterSamples: [],
+      validSampleTimesMs: [],
+    })
+    expect(state.lifecycle.warmup.warmup).toMatchObject({
+      phase: 'warming',
+      operationalSinceMs: null,
+      qualifiedAtMs: null,
+      countdownStartedAtMs: null,
+    })
+  })
+
+  it.each([
+    { state: 'disconnected' } as const,
+    {
+      state: 'error',
+      error: { code: 'connection-failed', message: 'Connection unavailable' },
+    } as const,
+  ])(
+    'retains truthful $state status without reconnecting on replay',
+    (status) => {
+      let state = finishSuccessfulMission()
+      state = apply(state, { type: 'status', occurredAt: 17_000, status })
+      state = apply(state, { type: 'runAgain', occurredAt: 17_100 })
+      expect(state.lifecycle).toEqual({ phase: 'preMission' })
+      expect(state.telemetryStatus).toEqual(status)
+      expect(canBeginWarmup(state)).toBe(false)
+    },
+  )
+
+  it('rejects old scheduler callbacks after replay and starts the next run at its own occurrence time', () => {
+    let state = runFrom(createMissionFlowState(true), [
+      connected(),
+      begin(),
+      ...sustainedOperationalSamples(13_000),
+      advance(16_000),
+    ])
+    state = finishSuccessfulMission(state)
+    const completedGeneration = state.runGeneration
+    state = apply(state, { type: 'runAgain', occurredAt: 20_000 })
+    const replayGeneration = state.runGeneration
+    state = apply(state, {
+      type: 'timeAdvanced',
+      occurredAt: 40_000,
+      runGeneration: completedGeneration,
+    })
+    expect(state.lifecycle).toEqual({ phase: 'preMission' })
+    expect(state.runGeneration).toBe(replayGeneration)
+    expect(state.diagnosticLog.at(-1)?.category).toBe(
+      'ignoredStaleGenerationCallback',
+    )
+
+    state = apply(state, { type: 'beginWarmup', occurredAt: 50_000 })
+    expect(state.lifecycle.phase).toBe('warming')
+    if (state.lifecycle.phase !== 'warming') return
+    expect(state.lifecycle.warmup.warmup.lastProcessedTimeMs).toBe(50_000)
+    expect(state.lifecycle.warmup.classifier.lastProcessedTimeMs).toBe(50_000)
+  })
+
+  it('rejects delayed puzzle, hint, reset, pause, and resume callbacks from an earlier run', () => {
+    const staleGeneration = 1
+    let state = finishSuccessfulMission(enterActiveMission(true))
+    state = apply(state, { type: 'runAgain', occurredAt: 20_000 })
+    state = enterReplayedActiveMission(state)
+    expect(state.lifecycle.phase).toBe('activeMission')
+
+    const staleActiveFacts = [
+      {
+        type: 'puzzleTileRotated',
+        occurredAt: 116_100,
+        tileId: 'top-straight',
+        runGeneration: staleGeneration,
+      },
+      {
+        type: 'puzzleHintRequested',
+        occurredAt: 116_200,
+        runGeneration: staleGeneration,
+      },
+      {
+        type: 'puzzleReset',
+        occurredAt: 116_300,
+        runGeneration: staleGeneration,
+      },
+      {
+        type: 'manualPause',
+        occurredAt: 116_400,
+        runGeneration: staleGeneration,
+      },
+    ] as const
+
+    for (const fact of staleActiveFacts) {
+      const beforeLifecycle = state.lifecycle
+      const beforeRun = retainedMission(state)
+      const beforeSequence = state.lastAppliedSequence
+      const beforeGeneration = state.runGeneration
+      state = apply(state, fact)
+      expect(state.lifecycle).toBe(beforeLifecycle)
+      expect(retainedMission(state)).toBe(beforeRun)
+      expect(state.runGeneration).toBe(beforeGeneration)
+      expect(state.lastAppliedSequence).toBe(beforeSequence + 1)
+      expect(state.diagnosticLog.at(-1)).toMatchObject({
+        category: 'ignoredStaleRunIntent',
+        details: { factType: fact.type },
+      })
+    }
+
+    state = apply(state, { type: 'manualPause', occurredAt: 116_500 })
+    expect(state.lifecycle.phase).toBe('suspended')
+    if (state.lifecycle.phase !== 'suspended') return
+    const beforeResumeLifecycle = state.lifecycle
+    const beforeResumeReasons = state.lifecycle.reasons
+    const beforeResumeSequence = state.lastAppliedSequence
+    const beforeResumeGeneration = state.runGeneration
+    state = apply(state, {
+      type: 'manualResume',
+      occurredAt: 116_600,
+      runGeneration: staleGeneration,
+    })
+    expect(state.lifecycle).toBe(beforeResumeLifecycle)
+    expect(state.lifecycle.phase).toBe('suspended')
+    if (state.lifecycle.phase !== 'suspended') return
+    expect(state.lifecycle.reasons).toEqual(beforeResumeReasons)
+    expect(state.runGeneration).toBe(beforeResumeGeneration)
+    expect(state.lastAppliedSequence).toBe(beforeResumeSequence + 1)
+    expect(state.diagnosticLog.at(-1)).toMatchObject({
+      category: 'ignoredStaleRunIntent',
+      details: { factType: 'manualResume' },
+    })
+  })
+
+  it('accepts equivalent current-run puzzle, hint, reset, pause, and resume callbacks', () => {
+    let state = finishSuccessfulMission()
+    state = apply(state, { type: 'runAgain', occurredAt: 20_000 })
+    state = enterReplayedActiveMission(state)
+    const initialOrientation =
+      retainedMission(state).puzzle.orientations['top-straight']
+
+    state = apply(state, {
+      type: 'puzzleTileRotated',
+      occurredAt: 116_100,
+      tileId: 'top-straight',
+    })
+    expect(retainedMission(state).session.statistics.puzzleMoveCount).toBe(1)
+
+    state = apply(state, { type: 'puzzleReset', occurredAt: 116_200 })
+    expect(retainedMission(state).puzzle.orientations['top-straight']).toBe(
+      initialOrientation,
+    )
+    expect(retainedMission(state).session.statistics.puzzleMoveCount).toBe(1)
+
+    let hintState = activeMissionWithFreshSamples(110, 18_000)
+    hintState = apply(hintState, {
+      type: 'manualPause',
+      occurredAt: 19_000,
+    })
+    hintState = rebuildSignal(hintState, 20_000)
+    hintState = apply(hintState, {
+      type: 'manualResume',
+      occurredAt: 25_500,
+    })
+    for (let time = 26_000; time <= 40_000; time += 1_000) {
+      hintState = apply(hintState, sample(time, 110))
+    }
+    hintState = apply(hintState, {
+      type: 'puzzleHintRequested',
+      occurredAt: 40_000,
+    })
+    expect(retainedMission(hintState).hint).not.toBeNull()
+
+    for (let time = 117_000; time <= 130_000; time += 1_000) {
+      state = apply(state, sample(time, 110))
+    }
+
+    state = apply(state, { type: 'manualPause', occurredAt: 130_200 })
+    expect(state.lifecycle.phase).toBe('suspended')
+    state = rebuildSignal(state, 131_000)
+    state = apply(state, { type: 'manualResume', occurredAt: 136_500 })
+    expect(state.lifecycle.phase).toBe('activeMission')
+  })
+
+  it('rejects delayed Back to Briefing and accepts the current rendered callback', () => {
+    let state = finishSuccessfulMission(enterActiveMission(true))
+    state = apply(state, { type: 'runAgain', occurredAt: 20_000 })
+    state = apply(state, { type: 'beginWarmup', occurredAt: 100_000 })
+    const warmingLifecycle = state.lifecycle
+    const generation = state.runGeneration
+
+    state = apply(state, {
+      type: 'backToBriefing',
+      occurredAt: 100_100,
+      runGeneration: 1,
+    })
+    expect(state.lifecycle).toBe(warmingLifecycle)
+    expect(state.runGeneration).toBe(generation)
+    expect(state.diagnosticLog.at(-1)).toMatchObject({
+      category: 'ignoredStaleRunIntent',
+      details: { factType: 'backToBriefing' },
+    })
+
+    state = apply(state, { type: 'backToBriefing', occurredAt: 100_200 })
+    expect(state.lifecycle).toEqual({ phase: 'preMission' })
+  })
+
+  it('rejects Run Again from an earlier finalized result without replacing the later result', () => {
+    let state = finishSuccessfulMission(enterActiveMission(true))
+    const firstResultGeneration = state.runGeneration
+    state = apply(state, { type: 'runAgain', occurredAt: 20_000 })
+    state = enterReplayedActiveMission(state)
+    state = finishSuccessfulMission(state, 116_100)
+    expect(state.lifecycle.phase).toBe('result')
+    if (state.lifecycle.phase !== 'result') return
+    const laterResult = state.lifecycle.result
+    const laterGeneration = state.runGeneration
+    const beforeSequence = state.lastAppliedSequence
+
+    state = apply(state, {
+      type: 'runAgain',
+      occurredAt: 117_000,
+      runGeneration: firstResultGeneration,
+    })
+    expect(state.lifecycle.phase).toBe('result')
+    if (state.lifecycle.phase !== 'result') return
+    expect(state.lifecycle.result).toBe(laterResult)
+    expect(state.runGeneration).toBe(laterGeneration)
+    expect(state.lastAppliedSequence).toBe(beforeSequence + 1)
+    expect(state.diagnosticLog.at(-1)).toMatchObject({
+      category: 'ignoredStaleRunIntent',
+      details: { factType: 'runAgain' },
+    })
+    expect(
+      state.diagnosticLog.filter(
+        ({ category }) => category === 'runAgainAccepted',
+      ),
+    ).toHaveLength(1)
+
+    state = apply(state, { type: 'runAgain', occurredAt: 117_100 })
+    expect(state.lifecycle).toEqual({ phase: 'preMission' })
+    expect(state.runGeneration).toBe(laterGeneration + 1)
+  })
+
+  it('records result entry, accepted replay, and generation establishment once', () => {
+    let state = createMissionFlowState(true)
+    state = runFrom(state, [
+      connected(),
+      begin(),
+      ...sustainedOperationalSamples(13_000),
+      advance(16_000),
+    ])
+    state = finishSuccessfulMission(state)
+    expect(
+      state.diagnosticLog.filter(
+        ({ category }) => category === 'resultEntered',
+      ),
+    ).toHaveLength(1)
+
+    state = apply(state, { type: 'runAgain', occurredAt: 17_000 })
+    state = apply(state, { type: 'runAgain', occurredAt: 17_100 })
+    expect(
+      state.diagnosticLog.filter(
+        ({ category }) => category === 'runAgainAccepted',
+      ),
+    ).toHaveLength(1)
+    expect(
+      state.diagnosticLog.filter(
+        ({ category }) => category === 'runGenerationEstablished',
+      ),
+    ).toHaveLength(1)
   })
 
   it('announces a decreasing trend once without changing the announcement on each stability tick or frozen wake', () => {

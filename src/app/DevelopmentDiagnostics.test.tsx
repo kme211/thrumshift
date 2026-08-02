@@ -2,11 +2,15 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { MonotonicClock } from '../platform/Clock'
+import { defaultGameplayTuning } from '../config/gameplayTuning'
+import { createClassifierState } from '../domain/heart-rate/classifier'
 import { SimulatedHeartRateSource } from '../telemetry/simulated/SimulatedHeartRateSource'
+import { createMissionRun } from './MissionRun'
 import {
   createMissionFlowState,
   missionFlowReducer,
 } from './MissionFlowController'
+import type { MissionFlowState } from './MissionFlowController'
 import {
   createDiagnosticLogExport,
   serializeDiagnosticLog,
@@ -59,6 +63,76 @@ describe('development diagnostic export', () => {
 })
 
 describe('DevelopmentDiagnostics', () => {
+  it('exposes exact canonical active-mission values without display rounding', () => {
+    const base = createMissionFlowState(true)
+    const run = createMissionRun(
+      0,
+      base.targetRange,
+      createClassifierState(0),
+      defaultGameplayTuning,
+    )
+    const exactRun = {
+      ...run,
+      session: {
+        ...run.session,
+        mission: {
+          ...run.session.mission,
+          activeElapsedTimeMs: 1_234,
+          stability: 72.345_678_9,
+        },
+        statistics: {
+          ...run.session.statistics,
+          completedDurationsMs: {
+            ...run.session.statistics.completedDurationsMs,
+            belowRange: 101,
+            operational: 202,
+            aboveRange: 303,
+          },
+        },
+      },
+    }
+    const state: MissionFlowState = {
+      ...base,
+      lifecycle: {
+        phase: 'activeMission',
+        runId: 'diagnostic-test',
+        mission: exactRun,
+      },
+      telemetryStatus: { state: 'connected' },
+    }
+    render(
+      <DevelopmentDiagnostics
+        simulatedSource={new SimulatedHeartRateSource({ now: () => 0 })}
+        state={state}
+        onResetDiagnostics={vi.fn()}
+      />,
+    )
+
+    const diagnostics = screen
+      .getByRole('heading', { name: 'Development diagnostics' })
+      .closest('aside')
+    const values = diagnostics?.querySelector('dl')
+    expect(diagnostics).toHaveAttribute('data-telemetry-status', 'connected')
+    expect(values).toHaveAttribute('data-mission-active-elapsed-ms', '1234')
+    expect(values).toHaveAttribute(
+      'data-mission-duration-below-range-ms',
+      '101',
+    )
+    expect(values).toHaveAttribute(
+      'data-mission-duration-operational-ms',
+      '202',
+    )
+    expect(values).toHaveAttribute(
+      'data-mission-duration-above-range-ms',
+      '303',
+    )
+    expect(values).toHaveAttribute(
+      'data-mission-hint-eligibility-ms',
+      String(run.hintEligibilityMs),
+    )
+    expect(values).toHaveAttribute('data-mission-stability', '72.3456789')
+  })
+
   it('keeps one diagnostics surface without a second mission puzzle authority', () => {
     const clock: MonotonicClock = { now: () => 0 }
     render(

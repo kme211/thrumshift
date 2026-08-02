@@ -7,6 +7,49 @@ export interface FlowAnnouncementTuning {
   readonly stabilityMaximum: number
 }
 
+export type InterruptionAnnouncement =
+  | 'manualPaused'
+  | 'hiddenRestored'
+  | 'signalStale'
+  | 'disconnected'
+  | 'reconnected'
+  | 'resumeAvailable'
+  | 'resumed'
+
+const interruptionAnnouncementPriority: readonly InterruptionAnnouncement[] = [
+  'disconnected',
+  'signalStale',
+  'hiddenRestored',
+  'reconnected',
+  'resumeAvailable',
+  'manualPaused',
+  'resumed',
+]
+
+const interruptionAnnouncementText: Readonly<
+  Record<InterruptionAnnouncement, string>
+> = {
+  manualPaused: 'Mission paused manually.',
+  hiddenRestored: 'Mission paused after the page was hidden.',
+  signalStale: 'Signal stale. Mission paused.',
+  disconnected: 'Heart-rate monitor disconnected. Mission paused.',
+  reconnected: 'Monitor reconnected. Mission remains paused.',
+  resumeAvailable: 'Signal restored. Resume available.',
+  resumed: 'Mission resumed.',
+}
+
+export function announcementForInterruption(
+  changes: readonly InterruptionAnnouncement[],
+  fallback: string,
+): string {
+  const selected = interruptionAnnouncementPriority.find((change) =>
+    changes.includes(change),
+  )
+  return selected === undefined
+    ? fallback
+    : interruptionAnnouncementText[selected]
+}
+
 function stabilityTrend(
   run: MissionRun,
   tuning: FlowAnnouncementTuning,

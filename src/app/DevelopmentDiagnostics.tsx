@@ -40,6 +40,7 @@ export function DevelopmentDiagnostics({
     <aside
       className="development-diagnostics mx-auto mt-6 max-w-3xl border border-dashed border-[var(--color-border)]"
       aria-labelledby="development-diagnostics-heading"
+      data-telemetry-status={state.telemetryStatus.state}
     >
       <h2
         id="development-diagnostics-heading"
@@ -55,13 +56,44 @@ export function DevelopmentDiagnostics({
         Diagnostic events captured: {diagnosticLog.length}
       </p>
       {activeRun === null && finalizedResult === null ? null : (
-        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+        <dl
+          className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm"
+          data-mission-active-elapsed-ms={
+            activeRun?.session.mission.activeElapsedTimeMs
+          }
+          data-mission-duration-below-range-ms={
+            activeRun?.session.statistics.completedDurationsMs.belowRange
+          }
+          data-mission-duration-operational-ms={
+            activeRun?.session.statistics.completedDurationsMs.operational
+          }
+          data-mission-duration-above-range-ms={
+            activeRun?.session.statistics.completedDurationsMs.aboveRange
+          }
+          data-mission-hint-eligibility-ms={activeRun?.hintEligibilityMs}
+          data-mission-stability={activeRun?.session.mission.stability}
+        >
           <dt>Active play</dt>
           <dd>
             {Math.round(
               (activeRun?.session.mission.activeElapsedTimeMs ??
                 finalizedResult?.activeDurationMs ??
                 0) / 1_000,
+            )}{' '}
+            seconds
+          </dd>
+          <dt>Classified play</dt>
+          <dd>
+            {Math.round(
+              (activeRun === null
+                ? (finalizedResult?.belowRangeDurationMs ?? 0) +
+                  (finalizedResult?.operationalDurationMs ?? 0) +
+                  (finalizedResult?.aboveRangeDurationMs ?? 0)
+                : activeRun.session.statistics.completedDurationsMs.belowRange +
+                  activeRun.session.statistics.completedDurationsMs
+                    .operational +
+                  activeRun.session.statistics.completedDurationsMs
+                    .aboveRange) / 1_000,
             )}{' '}
             seconds
           </dd>

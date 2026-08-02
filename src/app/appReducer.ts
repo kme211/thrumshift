@@ -29,21 +29,21 @@ export const appTransitionTable = {
       'warmupUpdated',
       'suspended',
       'suspensionCleared (reason present)',
-      'warmupRecovered (only manual latch remains)',
+      'warmupRecovered (only resume-required latch remains)',
       'runAbandoned',
     ],
     countdown: [
       'warmupUpdated',
       'suspended',
       'suspensionCleared (reason present)',
-      'warmupRecovered (only manual latch remains)',
+      'warmupRecovered (only resume-required latch remains)',
       'runAbandoned',
     ],
     activeMission: [
       'missionUpdated',
       'suspended',
       'suspensionCleared (reason present)',
-      'resumed (only manual latch remains)',
+      'resumed (only explicit-resume latch remains)',
       'runEnded',
       'runAbandoned',
     ],
@@ -180,23 +180,26 @@ export function appReducer<WarmupState, MissionState, Result>(
           const remaining = state.reasons.filter(
             (reason) => reason !== event.reason,
           )
-          // Clearing an automatic blocker never resumes. The manual reason is the
-          // explicit-resume latch, even when the original pause was automatic.
+          // Clearing an automatic blocker never resumes. `resumeRequired` is
+          // distinct from a pause the operator initiated manually.
           const first = remaining[0]
           const reasons: NonEmptyReasons =
-            first !== undefined ? [first, ...remaining.slice(1)] : ['manual']
+            first !== undefined
+              ? [first, ...remaining.slice(1)]
+              : ['resumeRequired']
           return { ...state, reasons }
         }
         case 'resumed':
           return state.resumeTarget.phase === 'activeMission' &&
             state.reasons.length === 1 &&
-            state.reasons[0] === 'manual'
+            (state.reasons[0] === 'manual' ||
+              state.reasons[0] === 'resumeRequired')
             ? state.resumeTarget
             : state
         case 'warmupRecovered':
           return state.resumeTarget.phase === 'activeMission' ||
             state.reasons.length !== 1 ||
-            state.reasons[0] !== 'manual'
+            state.reasons[0] !== 'resumeRequired'
             ? state
             : { phase: 'warming', runId: event.runId, warmup: event.warmup }
         case 'runEnded':

@@ -68,21 +68,21 @@ describe('appReducer', () => {
         'warmupUpdated',
         'suspended',
         'suspensionCleared (reason present)',
-        'warmupRecovered (only manual latch remains)',
+        'warmupRecovered (only resume-required latch remains)',
         'runAbandoned',
       ],
       countdown: [
         'warmupUpdated',
         'suspended',
         'suspensionCleared (reason present)',
-        'warmupRecovered (only manual latch remains)',
+        'warmupRecovered (only resume-required latch remains)',
         'runAbandoned',
       ],
       activeMission: [
         'missionUpdated',
         'suspended',
         'suspensionCleared (reason present)',
-        'resumed (only manual latch remains)',
+        'resumed (only explicit-resume latch remains)',
         'runEnded',
         'runAbandoned',
       ],
@@ -303,7 +303,28 @@ describe('appReducer', () => {
       runId,
       reason: 'hidden',
     })
-    expect(ready).toMatchObject({ reasons: ['manual'] })
+    expect(ready).toMatchObject({ reasons: ['resumeRequired'] })
+  })
+
+  it('adds and clears every automatic reason independently while retaining manual intent', () => {
+    const interrupted = reduce(
+      active(),
+      { type: 'suspended', runId, reason: 'manual' },
+      { type: 'suspended', runId, reason: 'hidden' },
+      { type: 'suspended', runId, reason: 'disconnect' },
+      { type: 'suspended', runId, reason: 'staleSignal' },
+    )
+    expect(interrupted).toMatchObject({
+      reasons: ['manual', 'hidden', 'disconnect', 'staleSignal'],
+    })
+    const cleared = reduce(
+      interrupted,
+      { type: 'suspensionCleared', runId, reason: 'hidden' },
+      { type: 'suspensionCleared', runId, reason: 'disconnect' },
+      { type: 'suspensionCleared', runId, reason: 'staleSignal' },
+    )
+    expect(cleared).toMatchObject({ reasons: ['manual'] })
+    expect(reduce(cleared, { type: 'resumed', runId })).toEqual(active())
   })
 
   it('never resumes automatically when blockers are cleared', () => {
@@ -329,7 +350,10 @@ describe('appReducer', () => {
       runId,
       reason: 'hidden',
     })
-    expect(ready).toMatchObject({ phase: 'suspended', reasons: ['manual'] })
+    expect(ready).toMatchObject({
+      phase: 'suspended',
+      reasons: ['resumeRequired'],
+    })
     expect(reduce(ready, { type: 'resumed', runId })).toEqual(active())
   })
 

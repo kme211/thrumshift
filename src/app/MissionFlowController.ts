@@ -8,7 +8,10 @@ import type {
   TargetRange,
 } from '../domain/heart-rate/classifier'
 import { isValidHeartRateBpm } from '../domain/heart-rate/range'
-import type { HeartRateSample } from '../domain/heart-rate/types'
+import type {
+  HeartRateSample,
+  HeartRateSourceIdentity,
+} from '../domain/heart-rate/types'
 import { advanceMissionSession } from '../domain/mission/missionSession'
 import type { MissionSessionFact } from '../domain/mission/missionStatistics'
 import {
@@ -28,6 +31,7 @@ import { appendFlowDiagnostics } from './FlowDiagnostics'
 import type { FlowDiagnosticEntry } from './FlowDiagnostics'
 import {
   announcementForActiveRunTransition,
+  announcementForInterruption,
   announcementForTelemetryStatus,
 } from './FlowAnnouncements'
 import {
@@ -51,6 +55,9 @@ export interface MissionFlowState {
   readonly targetDraft: { readonly lower: string; readonly upper: string }
   readonly targetError: string | null
   readonly telemetryStatus: TelemetrySourceStatus
+  readonly telemetrySourceIdentity: HeartRateSourceIdentity | null
+  readonly telemetrySourceGeneration: number
+  readonly pageVisibility: 'visible' | 'hidden'
   readonly latestPreMissionBpm: number | null
   readonly announcement: string
   readonly runGeneration: number
@@ -67,8 +74,14 @@ export type MissionFlowFactPayload =
       readonly type: 'status'
       readonly occurredAt: number
       readonly status: TelemetrySourceStatus
+      readonly source?: HeartRateSourceIdentity
+      readonly sourceGeneration?: number
     }
-  | { readonly type: 'sample'; readonly sample: HeartRateSample }
+  | {
+      readonly type: 'sample'
+      readonly sample: HeartRateSample
+      readonly sourceGeneration?: number
+    }
   | {
       readonly type: 'timeAdvanced'
       readonly occurredAt: number
@@ -87,7 +100,12 @@ export type MissionFlowFactPayload =
       readonly value: string
     }
   | { readonly type: 'targetCommitted'; readonly occurredAt: number }
-  | { readonly type: 'sourceChanged'; readonly occurredAt: number }
+  | {
+      readonly type: 'sourceChanged'
+      readonly occurredAt: number
+      readonly source?: HeartRateSourceIdentity
+      readonly sourceGeneration?: number
+    }
   | { readonly type: 'backToBriefing'; readonly occurredAt: number }
   | {
       readonly type: 'puzzleTileRotated'
@@ -126,6 +144,9 @@ export function createMissionFlowState(
     },
     targetError: null,
     telemetryStatus: { state: 'disconnected' },
+    telemetrySourceIdentity: null,
+    telemetrySourceGeneration: 0,
+    pageVisibility: 'visible',
     latestPreMissionBpm: null,
     announcement: 'Heart-rate monitor disconnected',
     runGeneration: 0,
@@ -248,7 +269,22 @@ function advanceRun(run: MissionRun, fact: MissionSessionFact): MissionRun {
   return { ...run, session: advanceMissionSession(run.session, fact, tuning) }
 }
 
+function advanceSuspendedRun(
+  run: MissionRun,
+  occurredAt: number,
+  sequence: number,
+): MissionRun {
+  return run.session.mission.lastProcessedTimeMs >= occurredAt
+    ? run
+    : advanceRun(run, {
+        type: 'timeAdvanced',
+        occurrenceTimeMs: occurredAt,
+        sequence: subSequence(sequence, EXTERNAL_FACT_SEQUENCE_OFFSET),
+      })
+}
+
 const DERIVED_SIGNAL_SEQUENCE_OFFSET = 1
+const STALE_SUSPENSION_SEQUENCE_OFFSET = 5
 const PAUSE_INVALIDATION_SEQUENCE_OFFSET = 6
 const EXTERNAL_FACT_SEQUENCE_OFFSET = 8
 const PUZZLE_COMPLETION_SEQUENCE_OFFSET = 9
@@ -284,23 +320,42 @@ function projectClassifierTransition(
  * time. Derived classifier deadlines use offsets 1–5, pause invalidation uses
  * 6, and the external fact uses 8. Puzzle completion follows rotation at 9.
  */
+interface ActiveSignalAuthority {
+  readonly run: MissionRun
+  readonly staleAt: number | null
+}
+
 function advanceActiveRunSignalAuthority(
   run: MissionRun,
   occurredAt: number,
   sequence: number,
-): MissionRun {
+): ActiveSignalAuthority {
   const transition = transitionClassifier(
     run.classifier,
     { type: 'timeAdvanced', occurrenceTimeMs: occurredAt },
     run.session.targetRange,
     tuning.heartRateClassifier,
   )
-  return projectClassifierTransition(
+  let projected = projectClassifierTransition(
     run,
     transition,
     sequence,
     DERIVED_SIGNAL_SEQUENCE_OFFSET,
   )
+  const staleAt =
+    transition.projections.find(
+      (projection) => projection.signalQuality === 'stale',
+    )?.occurrenceTimeMs ?? null
+  if (staleAt !== null && projected.session.result === null) {
+    projected = advanceRun(projected, {
+      type: 'lifecycleProjectionChanged',
+      occurrenceTimeMs: staleAt,
+      sequence: subSequence(sequence, STALE_SUSPENSION_SEQUENCE_OFFSET),
+      suspended: true,
+      disconnected: projected.session.statistics.disconnected,
+    })
+  }
+  return { run: projected, staleAt }
 }
 
 function runIdFor(lifecycle: MissionFlowLifecycle): string | null {
@@ -309,6 +364,48 @@ function runIdFor(lifecycle: MissionFlowLifecycle): string | null {
     : lifecycle.phase === 'suspended'
       ? lifecycle.resumeTarget.runId
       : lifecycle.runId
+}
+
+function addSuspensionReason(
+  lifecycle: MissionFlowLifecycle,
+  reason: 'manual' | 'resumeRequired' | 'hidden' | 'disconnect' | 'staleSignal',
+): MissionFlowLifecycle {
+  const runId = runIdFor(lifecycle)
+  if (runId === null) return lifecycle
+  return appReducer(lifecycle, { type: 'suspended', runId, reason })
+}
+
+function applyStaleReason(
+  lifecycle: MissionFlowLifecycle,
+  staleAt: number | null,
+): MissionFlowLifecycle {
+  return staleAt === null
+    ? lifecycle
+    : addSuspensionReason(lifecycle, 'staleSignal')
+}
+
+function isDisconnectedStatus(status: TelemetrySourceStatus): boolean {
+  return (
+    status.state === 'disconnected' ||
+    (status.state === 'error' && status.error.code === 'device-disconnected')
+  )
+}
+
+export function canResumeMission(state: MissionFlowState): boolean {
+  const run = liveRun(state.lifecycle)
+  return (
+    run !== null &&
+    state.lifecycle.phase === 'suspended' &&
+    state.lifecycle.resumeTarget.phase === 'activeMission' &&
+    state.lifecycle.reasons.length === 1 &&
+    (state.lifecycle.reasons[0] === 'manual' ||
+      state.lifecycle.reasons[0] === 'resumeRequired') &&
+    state.pageVisibility === 'visible' &&
+    state.telemetryStatus.state === 'connected' &&
+    run.classifier.signalQuality === 'usable' &&
+    run.classifier.stableClassification !== null &&
+    run.session.result === null
+  )
 }
 
 function recoverFromStaleSignal(
@@ -334,7 +431,7 @@ function recoverFromStaleSignal(
   if (
     next.phase === 'suspended' &&
     next.reasons.length === 1 &&
-    next.reasons[0] === 'manual'
+    next.reasons[0] === 'resumeRequired'
   ) {
     const warmup = transitionWarmup(
       createWarmupState(occurredAt),
@@ -437,10 +534,16 @@ function handleTargetCommit(
   }
 }
 
-function handleSourceChange(state: MissionFlowState): MissionFlowState {
+function handleSourceChange(
+  state: MissionFlowState,
+  fact: FactOf<'sourceChanged'>,
+): MissionFlowState {
   return {
     ...state,
     telemetryStatus: { state: 'disconnected' },
+    telemetrySourceIdentity: fact.source ?? state.telemetrySourceIdentity,
+    telemetrySourceGeneration:
+      fact.sourceGeneration ?? state.telemetrySourceGeneration,
     latestPreMissionBpm: null,
     announcement: 'Telemetry source changed',
   }
@@ -493,11 +596,12 @@ function handleManualPause(
   const run = liveRun(state.lifecycle)
   if (run === null || state.lifecycle.phase !== 'activeMission') return state
   const runId = state.lifecycle.runId
-  let advanced = advanceActiveRunSignalAuthority(
+  const authority = advanceActiveRunSignalAuthority(
     run,
     fact.occurredAt,
     fact.sequence,
   )
+  let advanced = authority.run
   if (advanced.session.result !== null) {
     return {
       ...state,
@@ -533,15 +637,27 @@ function handleManualPause(
     suspended: true,
     disconnected: false,
   })
-  let lifecycle = updateRunLifecycle(state.lifecycle, advanced)
+  let lifecycle = applyStaleReason(
+    updateRunLifecycle(state.lifecycle, advanced),
+    authority.staleAt,
+  )
   if (lifecycle.phase === 'activeMission') {
     lifecycle = appReducer(lifecycle, {
       type: 'suspended',
       runId,
       reason: 'manual',
     })
+  } else if (lifecycle.phase === 'suspended') {
+    lifecycle = addSuspensionReason(lifecycle, 'manual')
   }
-  return { ...state, lifecycle, announcement: 'Mission paused' }
+  return {
+    ...state,
+    lifecycle,
+    announcement: announcementForInterruption(
+      ['manualPaused'],
+      state.announcement,
+    ),
+  }
 }
 
 function handleManualResume(
@@ -549,21 +665,31 @@ function handleManualResume(
   fact: FactOf<'manualResume'>,
 ): MissionFlowState {
   const run = liveRun(state.lifecycle)
-  if (
-    run === null ||
-    state.lifecycle.phase !== 'suspended' ||
-    state.lifecycle.resumeTarget.phase !== 'activeMission' ||
-    state.lifecycle.reasons.length !== 1 ||
-    state.lifecycle.reasons[0] !== 'manual'
-  ) {
-    return state
-  }
+  if (run === null || state.lifecycle.phase !== 'suspended') return state
   const runId = state.lifecycle.resumeTarget.runId
-  let advanced = advanceActiveRunSignalAuthority(
+  const authority = advanceActiveRunSignalAuthority(
     run,
     fact.occurredAt,
     fact.sequence,
   )
+  let lifecycle = applyStaleReason(
+    updateRunLifecycle(state.lifecycle, authority.run),
+    authority.staleAt,
+  )
+  const current = { ...state, lifecycle }
+  if (!canResumeMission(current)) {
+    return authority.staleAt === null
+      ? current
+      : {
+          ...current,
+          announcement: announcementForInterruption(
+            ['signalStale'],
+            state.announcement,
+          ),
+        }
+  }
+  let advanced = liveRun(lifecycle)
+  if (advanced === null) return current
   advanced = advanceRun(advanced, {
     type: 'lifecycleProjectionChanged',
     occurrenceTimeMs: fact.occurredAt,
@@ -571,11 +697,15 @@ function handleManualResume(
     suspended: false,
     disconnected: false,
   })
-  let lifecycle = updateRunLifecycle(state.lifecycle, advanced)
+  lifecycle = updateRunLifecycle(lifecycle, advanced)
   if (lifecycle.phase === 'suspended') {
     lifecycle = appReducer(lifecycle, { type: 'resumed', runId })
   }
-  return { ...state, lifecycle, announcement: 'Mission resumed' }
+  return {
+    ...state,
+    lifecycle,
+    announcement: announcementForInterruption(['resumed'], state.announcement),
+  }
 }
 
 function handlePuzzleRotation(
@@ -584,11 +714,12 @@ function handlePuzzleRotation(
 ): MissionFlowState {
   const run = liveRun(state.lifecycle)
   if (run === null || state.lifecycle.phase !== 'activeMission') return state
-  let advanced = advanceActiveRunSignalAuthority(
+  const authority = advanceActiveRunSignalAuthority(
     run,
     fact.occurredAt,
     fact.sequence,
   )
+  let advanced = authority.run
   if (advanced.session.result !== null) {
     return {
       ...state,
@@ -598,6 +729,20 @@ function handlePuzzleRotation(
         advanced,
         state.announcement,
         announcementTuning,
+      ),
+    }
+  }
+  if (authority.staleAt !== null) {
+    advanced = advanceSuspendedRun(advanced, fact.occurredAt, fact.sequence)
+    return {
+      ...state,
+      lifecycle: applyStaleReason(
+        updateRunLifecycle(state.lifecycle, advanced),
+        authority.staleAt,
+      ),
+      announcement: announcementForInterruption(
+        ['signalStale'],
+        state.announcement,
       ),
     }
   }
@@ -651,11 +796,26 @@ function handlePuzzleHintRequest(
 ): MissionFlowState {
   const run = liveRun(state.lifecycle)
   if (run === null || state.lifecycle.phase !== 'activeMission') return state
-  let advanced = advanceActiveRunSignalAuthority(
+  const authority = advanceActiveRunSignalAuthority(
     run,
     fact.occurredAt,
     fact.sequence,
   )
+  let advanced = authority.run
+  if (authority.staleAt !== null) {
+    advanced = advanceSuspendedRun(advanced, fact.occurredAt, fact.sequence)
+    return {
+      ...state,
+      lifecycle: applyStaleReason(
+        updateRunLifecycle(state.lifecycle, advanced),
+        authority.staleAt,
+      ),
+      announcement: announcementForInterruption(
+        ['signalStale'],
+        state.announcement,
+      ),
+    }
+  }
   if (
     advanced.session.result !== null ||
     advanced.session.mission.activeElapsedTimeMs < advanced.hintEligibilityMs
@@ -688,11 +848,26 @@ function handlePuzzleReset(
 ): MissionFlowState {
   const run = liveRun(state.lifecycle)
   if (run === null || state.lifecycle.phase !== 'activeMission') return state
-  let advanced = advanceActiveRunSignalAuthority(
+  const authority = advanceActiveRunSignalAuthority(
     run,
     fact.occurredAt,
     fact.sequence,
   )
+  let advanced = authority.run
+  if (authority.staleAt !== null) {
+    advanced = advanceSuspendedRun(advanced, fact.occurredAt, fact.sequence)
+    return {
+      ...state,
+      lifecycle: applyStaleReason(
+        updateRunLifecycle(state.lifecycle, advanced),
+        authority.staleAt,
+      ),
+      announcement: announcementForInterruption(
+        ['signalStale'],
+        state.announcement,
+      ),
+    }
+  }
   if (advanced.session.result === null) {
     advanced = advanceRun(advanced, {
       type: 'puzzleReset',
@@ -723,17 +898,156 @@ function handlePuzzleReset(
   }
 }
 
+function interruptActiveRun(
+  state: MissionFlowState,
+  occurredAt: number,
+  sequence: number,
+  reason: 'hidden' | 'disconnect',
+): {
+  readonly lifecycle: MissionFlowLifecycle
+  readonly finalized: boolean
+  readonly staleAt: number | null
+} {
+  const run = liveRun(state.lifecycle)
+  if (run === null) {
+    return {
+      lifecycle: state.lifecycle,
+      finalized: false,
+      staleAt: null,
+    }
+  }
+  const authority = advanceActiveRunSignalAuthority(run, occurredAt, sequence)
+  let advanced = authority.run
+  if (advanced.session.result !== null) {
+    return {
+      lifecycle: updateRunLifecycle(state.lifecycle, advanced),
+      finalized: true,
+      staleAt: authority.staleAt,
+    }
+  }
+  const invalidated = transitionClassifier(
+    advanced.classifier,
+    {
+      type: 'invalidate',
+      occurrenceTimeMs: occurredAt,
+      reason: reason === 'hidden' ? 'hidden' : 'disconnect',
+    },
+    advanced.session.targetRange,
+    tuning.heartRateClassifier,
+  )
+  advanced = projectClassifierTransition(
+    advanced,
+    invalidated,
+    sequence,
+    PAUSE_INVALIDATION_SEQUENCE_OFFSET,
+  )
+  advanced = advanceRun(advanced, {
+    type: 'lifecycleProjectionChanged',
+    occurrenceTimeMs: occurredAt,
+    sequence: subSequence(sequence, EXTERNAL_FACT_SEQUENCE_OFFSET),
+    suspended: true,
+    disconnected:
+      reason === 'disconnect' || advanced.session.statistics.disconnected,
+  })
+  let lifecycle = applyStaleReason(
+    updateRunLifecycle(state.lifecycle, advanced),
+    authority.staleAt,
+  )
+  lifecycle = addSuspensionReason(lifecycle, reason)
+  return { lifecycle, finalized: false, staleAt: authority.staleAt }
+}
+
 function handleTelemetryStatus(
   state: MissionFlowState,
   fact: FactOf<'status'>,
 ): MissionFlowState {
+  const wasDisconnected = isDisconnectedStatus(state.telemetryStatus)
+  const disconnected = isDisconnectedStatus(fact.status)
+  const run = liveRun(state.lifecycle)
+  if (run !== null) {
+    if (disconnected && !wasDisconnected) {
+      const interrupted = interruptActiveRun(
+        state,
+        fact.occurredAt,
+        fact.sequence,
+        'disconnect',
+      )
+      return {
+        ...state,
+        lifecycle: interrupted.lifecycle,
+        telemetryStatus: fact.status,
+        announcement: interrupted.finalized
+          ? announcementForActiveRunTransition(
+              run,
+              liveRun(interrupted.lifecycle) ?? run,
+              state.announcement,
+              announcementTuning,
+            )
+          : announcementForInterruption(['disconnected'], state.announcement),
+      }
+    }
+    if (
+      fact.status.state === 'connected' &&
+      state.lifecycle.phase === 'suspended' &&
+      state.lifecycle.reasons.includes('disconnect')
+    ) {
+      const authority = advanceActiveRunSignalAuthority(
+        run,
+        fact.occurredAt,
+        fact.sequence,
+      )
+      let lifecycle = updateRunLifecycle(state.lifecycle, authority.run)
+      if (authority.run.session.result === null) {
+        let advanced = authority.run
+        advanced = advanceRun(advanced, {
+          type: 'lifecycleProjectionChanged',
+          occurrenceTimeMs: fact.occurredAt,
+          sequence: subSequence(fact.sequence, EXTERNAL_FACT_SEQUENCE_OFFSET),
+          suspended: true,
+          disconnected: false,
+        })
+        lifecycle = applyStaleReason(
+          updateRunLifecycle(state.lifecycle, advanced),
+          authority.staleAt,
+        )
+        if (lifecycle.phase === 'suspended') {
+          lifecycle = appReducer(lifecycle, {
+            type: 'suspensionCleared',
+            runId: lifecycle.resumeTarget.runId,
+            reason: 'disconnect',
+          })
+        }
+      }
+      return {
+        ...state,
+        lifecycle,
+        telemetryStatus: fact.status,
+        announcement:
+          authority.run.session.result === null
+            ? announcementForInterruption(['reconnected'], state.announcement)
+            : announcementForActiveRunTransition(
+                run,
+                authority.run,
+                state.announcement,
+                announcementTuning,
+              ),
+      }
+    }
+    if (
+      fact.status.state === state.telemetryStatus.state &&
+      disconnected === wasDisconnected
+    ) {
+      return state
+    }
+    return {
+      ...state,
+      telemetryStatus: fact.status,
+      announcement: announcementForTelemetryStatus(fact.status),
+    }
+  }
   let lifecycle = state.lifecycle
   const session = liveSession(lifecycle)
   if (session !== null && fact.status.state !== 'connected') {
-    const disconnected =
-      fact.status.state === 'disconnected' ||
-      (fact.status.state === 'error' &&
-        fact.status.error.code === 'device-disconnected')
     const invalidated = invalidateWarmupSession(
       session,
       fact.occurredAt,
@@ -772,7 +1086,7 @@ function handleTelemetryStatus(
     if (
       lifecycle.phase === 'suspended' &&
       lifecycle.reasons.length === 1 &&
-      lifecycle.reasons[0] === 'manual'
+      lifecycle.reasons[0] === 'resumeRequired'
     ) {
       lifecycle = appReducer(lifecycle, {
         type: 'warmupRecovered',
@@ -800,12 +1114,19 @@ function handleSample(
     bpm <= tuning.heartRateClassifier.plausibleBpm.maximum
   const run = liveRun(state.lifecycle)
   if (run !== null) {
-    if (state.lifecycle.phase !== 'activeMission') return state
-    let advanced = advanceActiveRunSignalAuthority(
+    if (
+      state.telemetryStatus.state !== 'connected' ||
+      state.pageVisibility === 'hidden'
+    ) {
+      return state
+    }
+    const wasActive = state.lifecycle.phase === 'activeMission'
+    const authority = advanceActiveRunSignalAuthority(
       run,
       occurrenceTimeMs,
       fact.sequence,
     )
+    let advanced = authority.run
     if (advanced.session.result !== null) {
       return {
         ...state,
@@ -818,18 +1139,27 @@ function handleSample(
         ),
       }
     }
+    let lifecycle = applyStaleReason(
+      updateRunLifecycle(state.lifecycle, advanced),
+      authority.staleAt,
+    )
+    const suspended =
+      lifecycle.phase === 'suspended' &&
+      lifecycle.resumeTarget.phase === 'activeMission'
     const classifier = transitionClassifier(
       advanced.classifier,
       { type: 'sample', occurrenceTimeMs, bpm },
       advanced.session.targetRange,
       tuning.heartRateClassifier,
     )
-    advanced = advanceRun(advanced, {
-      type: 'heartRateSample',
-      occurrenceTimeMs,
-      sequence: subSequence(fact.sequence, EXTERNAL_FACT_SEQUENCE_OFFSET),
-      bpm,
-    })
+    if (wasActive && !suspended) {
+      advanced = advanceRun(advanced, {
+        type: 'heartRateSample',
+        occurrenceTimeMs,
+        sequence: subSequence(fact.sequence, EXTERNAL_FACT_SEQUENCE_OFFSET),
+        bpm,
+      })
+    }
     if (advanced.session.result === null) {
       advanced = projectClassifierTransition(
         advanced,
@@ -838,15 +1168,37 @@ function handleSample(
         PUZZLE_COMPLETION_SEQUENCE_OFFSET,
       )
     }
+    lifecycle = updateRunLifecycle(lifecycle, advanced)
+    if (
+      lifecycle.phase === 'suspended' &&
+      lifecycle.reasons.includes('staleSignal') &&
+      advanced.classifier.signalQuality === 'usable' &&
+      advanced.classifier.stableClassification !== null
+    ) {
+      lifecycle = appReducer(lifecycle, {
+        type: 'suspensionCleared',
+        runId: lifecycle.resumeTarget.runId,
+        reason: 'staleSignal',
+      })
+    }
+    const becameStale = authority.staleAt !== null
+    const resumeAvailable =
+      !becameStale && canResumeMission({ ...state, lifecycle })
     return {
       ...state,
-      lifecycle: updateRunLifecycle(state.lifecycle, advanced),
-      announcement: announcementForActiveRunTransition(
-        run,
-        advanced,
-        state.announcement,
-        announcementTuning,
-      ),
+      lifecycle,
+      announcement: becameStale
+        ? announcementForInterruption(['signalStale'], state.announcement)
+        : resumeAvailable
+          ? announcementForInterruption(['resumeAvailable'], state.announcement)
+          : wasActive
+            ? announcementForActiveRunTransition(
+                run,
+                advanced,
+                state.announcement,
+                announcementTuning,
+              )
+            : state.announcement,
     }
   }
   const session = liveSession(state.lifecycle)
@@ -876,8 +1228,58 @@ function handleVisibilityChange(
   state: MissionFlowState,
   fact: FactOf<'visibility'>,
 ): MissionFlowState {
+  if (fact.state === state.pageVisibility) return state
+  const run = liveRun(state.lifecycle)
+  if (run !== null) {
+    if (fact.state === 'hidden') {
+      const interrupted = interruptActiveRun(
+        state,
+        fact.occurredAt,
+        fact.sequence,
+        'hidden',
+      )
+      return {
+        ...state,
+        lifecycle: interrupted.lifecycle,
+        pageVisibility: 'hidden',
+      }
+    }
+    const authority = advanceActiveRunSignalAuthority(
+      run,
+      fact.occurredAt,
+      fact.sequence,
+    )
+    let lifecycle = applyStaleReason(
+      updateRunLifecycle(state.lifecycle, authority.run),
+      authority.staleAt,
+    )
+    if (
+      lifecycle.phase === 'suspended' &&
+      lifecycle.reasons.includes('hidden')
+    ) {
+      lifecycle = appReducer(lifecycle, {
+        type: 'suspensionCleared',
+        runId: lifecycle.resumeTarget.runId,
+        reason: 'hidden',
+      })
+    }
+    return {
+      ...state,
+      lifecycle,
+      pageVisibility: 'visible',
+      announcement:
+        authority.run.session.result === null
+          ? announcementForInterruption(['hiddenRestored'], state.announcement)
+          : announcementForActiveRunTransition(
+              run,
+              authority.run,
+              state.announcement,
+              announcementTuning,
+            ),
+    }
+  }
   const session = liveSession(state.lifecycle)
-  if (session === null) return state
+  if (session === null) return { ...state, pageVisibility: fact.state }
   let lifecycle = state.lifecycle
   const runId =
     lifecycle.phase === 'suspended'
@@ -914,7 +1316,7 @@ function handleVisibilityChange(
     if (
       lifecycle.phase === 'suspended' &&
       lifecycle.reasons.length === 1 &&
-      lifecycle.reasons[0] === 'manual'
+      lifecycle.reasons[0] === 'resumeRequired'
     ) {
       lifecycle = appReducer(lifecycle, {
         type: 'warmupRecovered',
@@ -926,6 +1328,7 @@ function handleVisibilityChange(
   return {
     ...state,
     lifecycle,
+    pageVisibility: fact.state,
     announcement:
       fact.state === 'hidden'
         ? 'Warm-up reset because the page was hidden'
@@ -939,28 +1342,40 @@ function handleTimeAdvance(
 ): MissionFlowState {
   const run = liveRun(state.lifecycle)
   if (run !== null) {
-    if (state.lifecycle.phase !== 'activeMission') return state
-    let advanced = advanceActiveRunSignalAuthority(
+    const authority = advanceActiveRunSignalAuthority(
       run,
       fact.occurredAt,
       fact.sequence,
     )
-    if (advanced.session.result === null) {
+    let advanced = authority.run
+    if (
+      advanced.session.result === null &&
+      state.lifecycle.phase === 'activeMission'
+    ) {
       advanced = advanceRun(advanced, {
         type: 'timeAdvanced',
         occurrenceTimeMs: fact.occurredAt,
         sequence: subSequence(fact.sequence, EXTERNAL_FACT_SEQUENCE_OFFSET),
       })
+    } else if (advanced.session.result === null) {
+      advanced = advanceSuspendedRun(advanced, fact.occurredAt, fact.sequence)
     }
+    const lifecycle = applyStaleReason(
+      updateRunLifecycle(state.lifecycle, advanced),
+      authority.staleAt,
+    )
     return {
       ...state,
-      lifecycle: updateRunLifecycle(state.lifecycle, advanced),
-      announcement: announcementForActiveRunTransition(
-        run,
-        advanced,
-        state.announcement,
-        announcementTuning,
-      ),
+      lifecycle,
+      announcement:
+        authority.staleAt === null || state.lifecycle.phase === 'suspended'
+          ? announcementForActiveRunTransition(
+              run,
+              advanced,
+              state.announcement,
+              announcementTuning,
+            )
+          : announcementForInterruption(['signalStale'], state.announcement),
     }
   }
   const session = liveSession(state.lifecycle)
@@ -997,6 +1412,31 @@ function assertNeverFact(fact: never): never {
   throw new Error(`Unhandled flow fact: ${String(fact)}`)
 }
 
+function sameSource(
+  left: HeartRateSourceIdentity | null,
+  right: HeartRateSourceIdentity,
+): boolean {
+  return left?.id === right.id && left.type === right.type
+}
+
+function isCurrentTelemetryFact(
+  state: MissionFlowState,
+  fact: FactOf<'status'> | FactOf<'sample'>,
+): boolean {
+  if (
+    fact.sourceGeneration !== undefined &&
+    fact.sourceGeneration !== state.telemetrySourceGeneration
+  ) {
+    return false
+  }
+  const source = fact.type === 'status' ? fact.source : fact.sample.source
+  return (
+    state.telemetrySourceIdentity === null ||
+    source === undefined ||
+    sameSource(state.telemetrySourceIdentity, source)
+  )
+}
+
 function reduceMissionFlow(
   state: MissionFlowState,
   fact: MissionFlowFact,
@@ -1008,13 +1448,26 @@ function reduceMissionFlow(
   ) {
     return state
   }
+  if (
+    (fact.type === 'status' || fact.type === 'sample') &&
+    !isCurrentTelemetryFact(state, fact)
+  ) {
+    return state
+  }
+  if (
+    fact.type === 'sourceChanged' &&
+    fact.sourceGeneration !== undefined &&
+    fact.sourceGeneration <= state.telemetrySourceGeneration
+  ) {
+    return state
+  }
   switch (fact.type) {
     case 'targetDraftChanged':
       return handleTargetDraftChange(state, fact)
     case 'targetCommitted':
       return handleTargetCommit(state, fact)
     case 'sourceChanged':
-      return handleSourceChange(state)
+      return handleSourceChange(state, fact)
     case 'beginWarmup':
       return handleWarmupStart(state, fact)
     case 'backToBriefing':

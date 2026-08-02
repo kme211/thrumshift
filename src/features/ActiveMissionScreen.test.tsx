@@ -6,6 +6,7 @@ import { createMissionRun } from '../app/MissionRun'
 import { ControlledCoolantPuzzle } from '../components/mission/CoolantPuzzle'
 import { defaultGameplayTuning } from '../config/gameplayTuning'
 import { createClassifierState } from '../domain/heart-rate/classifier'
+import type { TelemetrySourceStatus } from '../telemetry/HeartRateTelemetrySource'
 import { ActiveMissionScreen } from './ActiveMissionScreen'
 
 function missionRun() {
@@ -38,25 +39,53 @@ function missionRun() {
   }
 }
 
-function renderMission(paused = false) {
+function renderMission(
+  paused = false,
+  reasons: readonly (
+    'manual' | 'resumeRequired' | 'hidden' | 'disconnect' | 'staleSignal'
+  )[] = paused ? ['manual'] : [],
+  canResume = true,
+  initialTelemetryStatus?: TelemetrySourceStatus,
+) {
   const handlers = {
     onRotate: vi.fn(),
     onHint: vi.fn(),
     onReset: vi.fn(),
     onPause: vi.fn(),
     onResume: vi.fn(),
+    onReconnect: vi.fn(),
+    onEndRun: vi.fn(),
   }
-  const view = render(
+  const renderScreen = (
+    nextReasons = reasons,
+    nextCanResume = canResume,
+    telemetryStatus: TelemetrySourceStatus = nextReasons.includes('disconnect')
+      ? ({ state: 'disconnected' } as const)
+      : ({ state: 'connected' } as const),
+  ) => (
     <ActiveMissionScreen
       run={missionRun()}
-      telemetryStatus={{ state: 'connected' }}
+      telemetryStatus={telemetryStatus}
       paused={paused}
+      suspensionReasons={nextReasons}
+      pageVisible
+      canResume={nextCanResume}
       hintEligible
       hintRemainingMs={0}
       {...handlers}
-    />,
+    />
   )
-  return { ...handlers, ...view }
+  const view = render(renderScreen(reasons, canResume, initialTelemetryStatus))
+  return {
+    ...handlers,
+    ...view,
+    rerenderMission: (
+      nextReasons: typeof reasons,
+      nextCanResume: boolean,
+      telemetryStatus?: TelemetrySourceStatus,
+    ) =>
+      view.rerender(renderScreen(nextReasons, nextCanResume, telemetryStatus)),
+  }
 }
 
 describe('ActiveMissionScreen', () => {
@@ -104,8 +133,128 @@ describe('ActiveMissionScreen', () => {
     const cancel = new Event('cancel', { cancelable: true })
     fireEvent(screen.getByRole('dialog', { name: 'Mission paused' }), cancel)
     expect(cancel.defaultPrevented).toBe(true)
+    await user.tab({ shift: true })
+    expect(screen.getByRole('button', { name: 'End run' })).toHaveFocus()
+    await user.tab()
+    expect(resume).toHaveFocus()
     await user.click(resume)
     expect(onResume).toHaveBeenCalledOnce()
+  })
+
+  it('explains overlapping blockers and exposes reconnect and end-run actions without enabling resume', async () => {
+    const user = userEvent.setup()
+    const { onReconnect, onResume, onEndRun } = renderMission(
+      true,
+      ['hidden', 'disconnect', 'staleSignal'],
+      false,
+    )
+    expect(
+      screen.getByText(
+        'The page was hidden. Mission time stopped immediately.',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('The heart-rate monitor disconnected.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('No fresh heart-rate signal is available.'),
+    ).toBeInTheDocument()
+    const reconnect = screen.getByRole('button', {
+      name: 'Reconnect monitor',
+    })
+    expect(reconnect).toHaveFocus()
+    await user.click(reconnect)
+    expect(onReconnect).toHaveBeenCalledOnce()
+    const resume = screen.getByRole('button', { name: 'Resume mission' })
+    expect(resume).toHaveAttribute('aria-disabled', 'true')
+    await user.click(resume)
+    expect(onResume).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'End run' }))
+    expect(onEndRun).toHaveBeenCalledOnce()
+  })
+
+  it('visibly associates a canonical telemetry error with the focused retry control', async () => {
+    const user = userEvent.setup()
+    const errorStatus = {
+      state: 'error' as const,
+      error: {
+        code: 'connection-failed' as const,
+        message: 'Move closer to the monitor and retry.',
+      },
+    }
+    const { onReconnect } = renderMission(
+      true,
+      ['disconnect'],
+      false,
+      errorStatus,
+    )
+    const dialog = screen.getByRole('dialog', { name: 'Mission paused' })
+    const retry = screen.getByRole('button', {
+      name: 'Reconnect monitor',
+    })
+    const error = screen.getByText('Move closer to the monitor and retry.')
+    expect(dialog).toBeVisible()
+    expect(error).toBeVisible()
+    expect(retry).toHaveAttribute('aria-describedby', error.id)
+    expect(retry).toHaveFocus()
+    expect(retry).toBeEnabled()
+    await user.click(retry)
+    expect(onReconnect).toHaveBeenCalledOnce()
+    expect(retry).toHaveFocus()
+    expect(dialog).toBeVisible()
+  })
+
+  it('focuses the interruption heading for an automatic visible-page pause', () => {
+    renderMission(true, ['staleSignal'], false)
+    expect(
+      screen.getByRole('heading', { name: 'Mission paused' }),
+    ).toHaveFocus()
+  })
+
+  it('hands reconnect focus to eligible Resume without moving it again on an unchanged rerender', () => {
+    const { rerenderMission } = renderMission(true, ['disconnect'], false)
+    const reconnect = screen.getByRole('button', {
+      name: 'Reconnect monitor',
+    })
+    expect(reconnect).toHaveFocus()
+
+    rerenderMission(['resumeRequired'], true)
+    expect(reconnect).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Resume mission' })).toHaveFocus()
+    expect(document.body).not.toHaveFocus()
+
+    screen.getByRole('button', { name: 'End run' }).focus()
+    rerenderMission(['resumeRequired'], true)
+    expect(screen.getByRole('button', { name: 'End run' })).toHaveFocus()
+  })
+
+  it('hands reconnect focus to the stable heading while another blocker remains without overlap thrashing', () => {
+    const { rerenderMission } = renderMission(
+      true,
+      ['disconnect', 'staleSignal'],
+      false,
+    )
+    expect(
+      screen.getByRole('button', { name: 'Reconnect monitor' }),
+    ).toHaveFocus()
+
+    rerenderMission(['staleSignal'], false)
+    expect(
+      screen.queryByRole('button', { name: 'Reconnect monitor' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Mission paused' }),
+    ).toHaveFocus()
+    expect(document.body).not.toHaveFocus()
+
+    screen.getByRole('button', { name: 'End run' }).focus()
+    rerenderMission(['staleSignal'], false, {
+      state: 'error',
+      error: { code: 'source-error', message: 'Retry failed' },
+    })
+    expect(screen.getByRole('button', { name: 'End run' })).toHaveFocus()
+    rerenderMission(['manual', 'staleSignal'], false)
+    expect(screen.getByRole('button', { name: 'End run' })).toHaveFocus()
   })
 
   it('keeps countdown changes silent and announces only hint and completion transitions', async () => {

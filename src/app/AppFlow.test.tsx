@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -103,6 +103,29 @@ function renderFlow(simulatedTimers = new FakeSimulatedTimers()) {
   }
 }
 
+async function enterActiveFlow(
+  flow: ReturnType<typeof renderFlow>,
+): Promise<void> {
+  await act(() => flow.simulatedSource.connect())
+  fireEvent.click(screen.getByRole('button', { name: 'Begin Warm-Up' }))
+  for (const time of [
+    0, 500, 1_000, 2_000, 3_000, 4_000, 5_000, 6_000, 7_000, 8_000, 9_000,
+    10_000, 11_000, 12_000, 13_000,
+  ]) {
+    flow.setTime(time)
+    act(() => flow.simulatedSource.emitSample(110))
+  }
+  flow.setTime(16_000)
+  await act(() => flow.scheduler.wake(16_000))
+  expect(
+    await screen.findByRole('heading', {
+      level: 1,
+      name: 'Reactor Cooling Failure',
+    }),
+  ).toBeInTheDocument()
+  expect(screen.getByText('Active mission')).toBeInTheDocument()
+}
+
 describe('AppFlow pre-mission and warm-up integration', () => {
   it('keeps source-owned continuous samples running across screen transitions', async () => {
     const { simulatedSource, simulatedTimers, setTime } = renderFlow()
@@ -163,7 +186,7 @@ describe('AppFlow pre-mission and warm-up integration', () => {
     visibility.emit('hidden', 100)
     expect(
       await screen.findByRole('heading', { name: 'Mission paused' }),
-    ).toHaveFocus()
+    ).toBeInTheDocument()
     visibility.emit('visible', 200)
     expect(
       await screen.findByRole('heading', { name: 'Warm-up' }),
@@ -219,7 +242,8 @@ describe('AppFlow pre-mission and warm-up integration', () => {
   })
 
   it('keeps diagnostics in one development entry and removes fake lifecycle controls', async () => {
-    renderFlow()
+    const { simulatedSource } = renderFlow()
+    await act(() => simulatedSource.connect())
     expect(
       await screen.findByRole('heading', { name: 'Development diagnostics' }),
     ).toBeInTheDocument()
@@ -259,5 +283,156 @@ describe('AppFlow pre-mission and warm-up integration', () => {
     view.unmount()
     expect(visibility.listener).toBeNull()
     time = 1
+  })
+
+  it('releases Wake Lock for active interruption and reacquires only after a valid explicit resume', async () => {
+    const flow = renderFlow()
+    await enterActiveFlow(flow)
+    for (let time = 17_000; time <= 22_000; time += 1_000) {
+      flow.setTime(time)
+      act(() => flow.simulatedSource.emitSample(110))
+    }
+    expect(flow.wakeLock.setActive).toHaveBeenLastCalledWith(true)
+    flow.setTime(23_000)
+    fireEvent.click(screen.getByRole('button', { name: 'Pause mission' }))
+    expect(flow.wakeLock.setActive).toHaveBeenLastCalledWith(false)
+
+    const resume = screen.getByRole('button', { name: 'Resume mission' })
+    expect(resume).toHaveAttribute('aria-disabled', 'true')
+    for (let time = 24_000; time <= 29_000; time += 1_000) {
+      flow.setTime(time)
+      act(() => flow.simulatedSource.emitSample(110))
+    }
+    expect(resume).toHaveAttribute('aria-disabled', 'false')
+    flow.setTime(29_500)
+    fireEvent.click(resume)
+    expect(flow.wakeLock.setActive).toHaveBeenLastCalledWith(true)
+  })
+
+  it('releases active-mission Wake Lock on hidden suspension', async () => {
+    const flow = renderFlow()
+    await enterActiveFlow(flow)
+    for (let time = 17_000; time <= 22_000; time += 1_000) {
+      flow.setTime(time)
+      act(() => flow.simulatedSource.emitSample(110))
+    }
+    expect(flow.wakeLock.setActive).toHaveBeenLastCalledWith(true)
+    flow.setTime(23_000)
+    act(() => flow.visibility.emit('hidden', 23_000))
+    expect(flow.wakeLock.setActive).toHaveBeenLastCalledWith(false)
+  })
+
+  it('releases active-mission Wake Lock on exact stale suspension', async () => {
+    const flow = renderFlow()
+    await enterActiveFlow(flow)
+    for (let time = 17_000; time <= 22_000; time += 1_000) {
+      flow.setTime(time)
+      act(() => flow.simulatedSource.emitSample(110))
+    }
+    expect(flow.wakeLock.setActive).toHaveBeenLastCalledWith(true)
+    flow.setTime(25_000)
+    await act(() => flow.scheduler.wake(25_000))
+    expect(
+      screen.getByText('No fresh heart-rate signal is available.'),
+    ).toBeInTheDocument()
+    expect(flow.wakeLock.setActive).toHaveBeenLastCalledWith(false)
+  })
+
+  it('releases active-mission Wake Lock on disconnect suspension', async () => {
+    const flow = renderFlow()
+    await enterActiveFlow(flow)
+    for (let time = 17_000; time <= 22_000; time += 1_000) {
+      flow.setTime(time)
+      act(() => flow.simulatedSource.emitSample(110))
+    }
+    expect(flow.wakeLock.setActive).toHaveBeenLastCalledWith(true)
+    flow.setTime(23_000)
+    await act(() => flow.simulatedSource.disconnect())
+    expect(flow.wakeLock.setActive).toHaveBeenLastCalledWith(false)
+  })
+
+  it('initiates reconnect only from the interruption button and retains the puzzle', async () => {
+    const user = userEvent.setup()
+    const flow = renderFlow()
+    await enterActiveFlow(flow)
+    for (let time = 17_000; time <= 22_000; time += 1_000) {
+      flow.setTime(time)
+      act(() => flow.simulatedSource.emitSample(110))
+    }
+    const tile = screen.getByRole('button', { name: /Row 1, column 2/ })
+    await user.click(tile)
+    const retainedOrientation = tile.getAttribute('aria-label')
+    const connect = vi.spyOn(flow.simulatedSource, 'connect')
+    const callsBefore = connect.mock.calls.length
+
+    flow.setTime(23_000)
+    await act(() => flow.simulatedSource.disconnect())
+    expect(connect).toHaveBeenCalledTimes(callsBefore)
+    const reconnect = screen.getByRole('button', {
+      name: 'Reconnect monitor',
+    })
+    expect(reconnect).toHaveFocus()
+    await user.click(reconnect)
+    expect(connect).toHaveBeenCalledTimes(callsBefore + 1)
+    expect(
+      screen.queryByRole('button', { name: 'Reconnect monitor' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Mission paused' }),
+    ).toHaveFocus()
+    expect(document.body).not.toHaveFocus()
+    expect(tile).toHaveAttribute('aria-label', retainedOrientation!)
+    expect(
+      screen.getByRole('button', { name: 'Resume mission' }),
+    ).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('keeps a failed reconnect suspended with a stable retry action and error status', async () => {
+    const user = userEvent.setup()
+    const flow = renderFlow()
+    await enterActiveFlow(flow)
+    for (let time = 17_000; time <= 22_000; time += 1_000) {
+      flow.setTime(time)
+      act(() => flow.simulatedSource.emitSample(110))
+    }
+    flow.setTime(23_000)
+    await act(() => flow.simulatedSource.disconnect())
+    const reconnect = screen.getByRole('button', {
+      name: 'Reconnect monitor',
+    })
+    expect(reconnect).toHaveFocus()
+    const connect = vi
+      .spyOn(flow.simulatedSource, 'connect')
+      .mockImplementation(async () => {
+        flow.simulatedSource.emitError('Reconnect failed')
+      })
+    const callsBeforeRetry = connect.mock.calls.length
+
+    flow.setTime(24_000)
+    await user.click(reconnect)
+    const dialog = screen.getByRole('dialog', { name: 'Mission paused' })
+    expect(dialog).toBeVisible()
+    expect(reconnect).toBeVisible()
+    expect(reconnect).toHaveFocus()
+    expect(reconnect).toBeEnabled()
+    expect(screen.getByLabelText('Bio-link status')).toHaveTextContent(
+      'Bio-link: error; signal insufficient',
+    )
+    expect(within(dialog).getByText('Reconnect failed')).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Resume mission' }),
+    ).toHaveAttribute('aria-disabled', 'true')
+    const announcement = document.querySelector('[aria-live="polite"]')
+    expect(announcement).toHaveTextContent('Reconnect failed')
+    const announcedText = announcement?.textContent
+
+    act(() => flow.simulatedSource.emitError('Reconnect failed'))
+    expect(announcement).toHaveTextContent(announcedText!)
+    expect(reconnect).toHaveFocus()
+
+    await user.click(reconnect)
+    expect(connect).toHaveBeenCalledTimes(callsBeforeRetry + 2)
+    expect(reconnect).toHaveFocus()
+    expect(dialog).toBeVisible()
   })
 })

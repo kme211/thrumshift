@@ -210,10 +210,143 @@ test('manual pause freezes controls and restores logical keyboard focus', async 
   await page.getByRole('button', { name: 'Pause mission' }).click()
   const resume = page.getByRole('button', { name: 'Resume mission' })
   await expect(resume).toBeFocused()
+  await expect(resume).toHaveAttribute('aria-disabled', 'true')
   await expect(tile).toBeDisabled()
+  await resume.press('Shift+Tab')
+  expect(
+    await page
+      .getByRole('dialog', { name: 'Mission paused' })
+      .evaluate((dialog) => dialog.contains(document.activeElement)),
+  ).toBe(true)
+  await page.keyboard.press('Tab')
+  expect(
+    await page
+      .getByRole('dialog', { name: 'Mission paused' })
+      .evaluate((dialog) => dialog.contains(document.activeElement)),
+  ).toBe(true)
+  await expect(resume).toHaveAttribute('aria-disabled', 'false', {
+    timeout: 5_000,
+  })
   await resume.press('Enter')
   await expect(
     page.getByRole('button', { name: 'Pause mission' }),
   ).toBeFocused()
   await expect(tile).toHaveAttribute('aria-label', before!)
+})
+
+test('stale signal pauses exactly once, retains the puzzle, and requires explicit resume', async ({
+  page,
+}) => {
+  await enterActiveMission(page)
+  const tile = page.getByRole('button', { name: /Row 1, column 2/ })
+  await tile.click()
+  const retainedOrientation = await tile.getAttribute('aria-label')
+  await page.getByRole('button', { name: 'Stop Samples' }).click()
+
+  await expect(
+    page.getByRole('dialog', { name: 'Mission paused' }),
+  ).toBeVisible({ timeout: 5_000 })
+  await expect(
+    page.getByText('No fresh heart-rate signal is available.'),
+  ).toBeVisible()
+  const diagnostics = page.getByRole('complementary', {
+    name: 'Development diagnostics',
+  })
+  const missionValues = diagnostics.locator('dl')
+  const exactAttributes = [
+    'data-mission-active-elapsed-ms',
+    'data-mission-duration-below-range-ms',
+    'data-mission-duration-operational-ms',
+    'data-mission-duration-above-range-ms',
+    'data-mission-hint-eligibility-ms',
+    'data-mission-stability',
+  ] as const
+  const frozenValues = Object.fromEntries(
+    await Promise.all(
+      exactAttributes.map(async (attribute) => [
+        attribute,
+        await missionValues.getAttribute(attribute),
+      ]),
+    ),
+  )
+  for (const attribute of exactAttributes)
+    expect(frozenValues[attribute]).not.toBeNull()
+
+  await page
+    .getByRole('button', { name: 'Disconnect simulator' })
+    .evaluate((button: HTMLButtonElement) => button.click())
+  await expect(
+    page.getByRole('button', { name: 'Reconnect monitor' }),
+  ).toBeVisible()
+  await expect(diagnostics).toHaveAttribute(
+    'data-telemetry-status',
+    'disconnected',
+  )
+  await expect(
+    page.getByText('The heart-rate monitor disconnected.'),
+  ).toBeVisible()
+  for (const attribute of exactAttributes) {
+    await expect(missionValues).toHaveAttribute(
+      attribute,
+      frozenValues[attribute]!,
+    )
+  }
+  await expect(tile).toHaveAttribute('aria-label', retainedOrientation!)
+  await expect(
+    page.getByRole('button', { name: 'Resume mission' }),
+  ).toHaveAttribute('aria-disabled', 'true')
+})
+
+test('disconnect recovery uses a direct reconnect gesture and preserves explicit resume', async ({
+  page,
+}) => {
+  await enterActiveMission(page)
+  await page.getByRole('button', { name: 'Disconnect simulator' }).click()
+  const reconnect = page.getByRole('button', { name: 'Reconnect monitor' })
+  await expect(reconnect).toBeFocused()
+  await reconnect.click()
+  const resume = page.getByRole('button', { name: 'Resume mission' })
+  await expect(resume).toHaveAttribute('aria-disabled', 'true')
+  await page
+    .getByRole('button', { name: 'Start Samples' })
+    .evaluate((button: HTMLButtonElement) => button.click())
+  await expect(resume).toHaveAttribute('aria-disabled', 'false', {
+    timeout: 5_000,
+  })
+  await resume.click()
+  await expect(
+    page.getByRole('button', { name: 'Pause mission' }),
+  ).toBeFocused()
+})
+
+test('hidden and disconnected blockers clear independently', async ({
+  page,
+}) => {
+  await enterActiveMission(page)
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await page
+    .getByRole('button', { name: 'Disconnect simulator' })
+    .click({ force: true })
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await expect(
+    page.getByText('The heart-rate monitor disconnected.'),
+  ).toBeVisible()
+  await expect(
+    page.getByText('The page was hidden. Mission time stopped immediately.'),
+  ).toHaveCount(0)
+  await page.getByRole('button', { name: 'Reconnect monitor' }).click()
+  const resume = page.getByRole('button', { name: 'Resume mission' })
+  await expect(resume).toHaveAttribute('aria-disabled', 'true')
 })

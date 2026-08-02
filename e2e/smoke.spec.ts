@@ -25,6 +25,8 @@ test('shows the pre-mission flow without horizontal overflow', async ({
     const script = await page.request.get(scriptUrl)
     const source = await script.text()
     expect(source).not.toContain('Development diagnostics')
+    expect(source).not.toContain('data-mission-active-elapsed-ms')
+    expect(source).not.toContain('data-mission-stability')
     expect(source).not.toContain('Coolant routing workbench')
     expect(source).not.toContain('Start Samples')
     expect(source).not.toContain('Stop Samples')

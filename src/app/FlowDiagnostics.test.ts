@@ -18,6 +18,56 @@ function connectedFact(occurredAt: number, sequence: number): MissionFlowFact {
 }
 
 describe('flow diagnostics', () => {
+  it('logs only canonical visibility changes and leaves duplicate facts gameplay-neutral', () => {
+    const facts: readonly MissionFlowFact[] = [
+      { type: 'visibility', occurredAt: 100, sequence: 1, state: 'hidden' },
+      { type: 'visibility', occurredAt: 110, sequence: 2, state: 'hidden' },
+      { type: 'visibility', occurredAt: 120, sequence: 3, state: 'visible' },
+      { type: 'visibility', occurredAt: 130, sequence: 4, state: 'visible' },
+    ]
+    let enabled = createMissionFlowState(true)
+    let disabled = createMissionFlowState(false)
+
+    enabled = missionFlowReducer(enabled, facts[0]!)
+    disabled = missionFlowReducer(disabled, facts[0]!)
+    expect(
+      enabled.diagnosticLog.filter(
+        ({ category }) => category === 'visibilityChanged',
+      ),
+    ).toHaveLength(1)
+    const hiddenLifecycle = enabled.lifecycle
+    const hiddenLog = enabled.diagnosticLog
+
+    enabled = missionFlowReducer(enabled, facts[1]!)
+    disabled = missionFlowReducer(disabled, facts[1]!)
+    expect(enabled.lifecycle).toBe(hiddenLifecycle)
+    expect(enabled.pageVisibility).toBe('hidden')
+    expect(enabled.diagnosticLog).toBe(hiddenLog)
+
+    enabled = missionFlowReducer(enabled, facts[2]!)
+    disabled = missionFlowReducer(disabled, facts[2]!)
+    expect(
+      enabled.diagnosticLog.filter(
+        ({ category }) => category === 'visibilityChanged',
+      ),
+    ).toHaveLength(2)
+    const visibleLifecycle = enabled.lifecycle
+    const visibleLog = enabled.diagnosticLog
+
+    enabled = missionFlowReducer(enabled, facts[3]!)
+    disabled = missionFlowReducer(disabled, facts[3]!)
+    expect(enabled.lifecycle).toBe(visibleLifecycle)
+    expect(enabled.pageVisibility).toBe('visible')
+    expect(enabled.diagnosticLog).toBe(visibleLog)
+    expect({
+      lifecycle: enabled.lifecycle,
+      pageVisibility: enabled.pageVisibility,
+    }).toEqual({
+      lifecycle: disabled.lifecycle,
+      pageVisibility: disabled.pageVisibility,
+    })
+  })
+
   it('derives the same sanitized patch without mutating either state', () => {
     const before = createMissionFlowState(false)
     const fact = connectedFact(100, 1)

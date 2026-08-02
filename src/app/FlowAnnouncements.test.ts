@@ -8,6 +8,7 @@ import type {
 } from '../domain/mission/activeMission'
 import {
   announcementForActiveRunTransition,
+  announcementForInterruption,
   announcementForTelemetryStatus,
 } from './FlowAnnouncements'
 import { createMissionRun } from './MissionRun'
@@ -80,6 +81,18 @@ function announce(
 }
 
 describe('flow announcements', () => {
+  it('selects one deterministic interruption announcement by priority', () => {
+    expect(
+      announcementForInterruption(
+        ['resumeAvailable', 'signalStale', 'disconnected'],
+        'Existing announcement',
+      ),
+    ).toBe('Heart-rate monitor disconnected. Mission paused.')
+    expect(announcementForInterruption([], 'Existing announcement')).toBe(
+      'Existing announcement',
+    )
+  })
+
   it('returns the fallback for an ordinary unchanged transition', () => {
     const before = runWith({ classification: 'above', stability: 74 })
     const after = runWith({ classification: 'above', stability: 73 })

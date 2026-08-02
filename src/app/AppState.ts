@@ -1,7 +1,7 @@
 export type RunId = string
 
 export type SuspensionReason =
-  'manual' | 'hidden' | 'disconnect' | 'staleSignal'
+  'manual' | 'resumeRequired' | 'hidden' | 'disconnect' | 'staleSignal'
 
 export type NonEmptyReasons = readonly [SuspensionReason, ...SuspensionReason[]]
 
@@ -91,7 +91,7 @@ export type AppEvent<WarmupState, MissionState, Result> =
   | {
       readonly type: 'suspensionCleared'
       readonly runId: RunId
-      readonly reason: Exclude<SuspensionReason, 'manual'>
+      readonly reason: 'hidden' | 'disconnect' | 'staleSignal'
     }
   | { readonly type: 'resumed'; readonly runId: RunId }
   | {

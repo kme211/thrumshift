@@ -28,6 +28,7 @@ export interface FlowDiagnosticState {
   readonly invalidationReason: ClassifierInvalidationReason | null
   readonly warmupStage: string | null
   readonly warmupProgressMs: number
+  readonly suspensionReasons: readonly string[]
 }
 
 export interface FlowDiagnosticPatch {
@@ -47,6 +48,18 @@ export interface FlowDiagnosticTuning {
 interface PendingDiagnosticEvent {
   readonly category: string
   readonly details?: Record<string, unknown>
+}
+
+function sameTelemetryStatus(
+  left: MissionFlowState['telemetryStatus'],
+  right: MissionFlowState['telemetryStatus'],
+): boolean {
+  if (left.state !== right.state) return false
+  if (left.state !== 'error' || right.state !== 'error') return true
+  return (
+    left.error.code === right.error.code &&
+    left.error.message === right.error.message
+  )
 }
 
 export function getWarmupDiagnosticSession(
@@ -103,6 +116,8 @@ export function getFlowDiagnosticState(
       session === null
         ? 0
         : getWarmupProgressMs(session.warmup, tuning.warmupQualificationMs),
+    suspensionReasons:
+      state.lifecycle.phase === 'suspended' ? state.lifecycle.reasons : [],
   }
 }
 
@@ -140,7 +155,22 @@ function getDiagnosticEvents({
     ]
   }
 
-  if (fact.type === 'status') {
+  const staleSourceCallback =
+    (fact.type === 'status' || fact.type === 'sample') &&
+    fact.sourceGeneration !== undefined &&
+    fact.sourceGeneration !== before.telemetrySourceGeneration
+  if (staleSourceCallback) {
+    events.push({
+      category: 'ignoredStaleSourceCallback',
+      details: {
+        callbackGeneration: fact.sourceGeneration,
+        currentGeneration: before.telemetrySourceGeneration,
+      },
+    })
+  } else if (
+    fact.type === 'status' &&
+    !sameTelemetryStatus(before.telemetryStatus, after.telemetryStatus)
+  ) {
     events.push({
       category:
         fact.status.state === 'error' ? 'error' : 'connectionStatusChanged',
@@ -163,7 +193,10 @@ function getDiagnosticEvents({
         ...(accepted ? {} : { reason: 'invalid-or-implausible-bpm' }),
       },
     })
-  } else if (fact.type === 'visibility') {
+  } else if (
+    fact.type === 'visibility' &&
+    before.pageVisibility !== after.pageVisibility
+  ) {
     events.push({
       category: 'visibilityChanged',
       details: { state: fact.state },
@@ -233,6 +266,18 @@ function getDiagnosticEvents({
     events.push({
       category: 'lifecycleTransition',
       details: { from: before.lifecycle.phase, to: after.lifecycle.phase },
+    })
+  }
+  const addedReasons = afterState.suspensionReasons.filter(
+    (reason) => !beforeState.suspensionReasons.includes(reason),
+  )
+  const removedReasons = beforeState.suspensionReasons.filter(
+    (reason) => !afterState.suspensionReasons.includes(reason),
+  )
+  if (addedReasons.length > 0 || removedReasons.length > 0) {
+    events.push({
+      category: 'interruptionChanged',
+      details: { addedReasons, removedReasons },
     })
   }
   return events

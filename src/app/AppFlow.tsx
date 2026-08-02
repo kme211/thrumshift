@@ -21,6 +21,7 @@ import type { WebBluetoothHeartRateSource } from '../telemetry/bluetooth/WebBlue
 import type { SimulatedHeartRateSource } from '../telemetry/simulated/SimulatedHeartRateSource'
 import {
   canBeginWarmup,
+  canResumeMission,
   createMissionFlowState,
   missionFlowReducer,
 } from './MissionFlowController'
@@ -44,8 +45,16 @@ interface AppFlowProps {
   readonly simulatedSource: SimulatedHeartRateSource | null
 }
 
-function wantsWakeLock(phase: string): boolean {
-  return phase === 'warming' || phase === 'countdown'
+function wantsWakeLock(state: {
+  readonly lifecycle: { readonly phase: string }
+  readonly pageVisibility: 'visible' | 'hidden'
+}): boolean {
+  return (
+    state.pageVisibility === 'visible' &&
+    (state.lifecycle.phase === 'warming' ||
+      state.lifecycle.phase === 'countdown' ||
+      state.lifecycle.phase === 'activeMission')
+  )
 }
 
 export function AppFlow({
@@ -62,6 +71,7 @@ export function AppFlow({
     createMissionFlowState,
   )
   const nextFactSequence = useRef(0)
+  const nextSourceGeneration = useRef(0)
   const dispatchFact = useCallback(
     (fact: MissionFlowFactPayload) =>
       dispatch({ ...fact, sequence: ++nextFactSequence.current }),
@@ -74,13 +84,27 @@ export function AppFlow({
     selectedSource === 'simulated' && simulatedSource !== null
       ? simulatedSource
       : bluetoothSource
+  const wakeLockActive = wantsWakeLock(state)
 
   useEffect(() => {
+    const sourceGeneration = ++nextSourceGeneration.current
+    dispatchFact({
+      type: 'sourceChanged',
+      occurredAt: clock.now(),
+      source: source.identity,
+      sourceGeneration,
+    })
     const unsubscribeStatus = source.subscribeStatus((status) =>
-      dispatchFact({ type: 'status', occurredAt: clock.now(), status }),
+      dispatchFact({
+        type: 'status',
+        occurredAt: clock.now(),
+        status,
+        source: source.identity,
+        sourceGeneration,
+      }),
     )
     const unsubscribeSamples = source.subscribeSamples((sample) =>
-      dispatchFact({ type: 'sample', sample }),
+      dispatchFact({ type: 'sample', sample, sourceGeneration }),
     )
     return () => {
       unsubscribeStatus()
@@ -88,17 +112,20 @@ export function AppFlow({
     }
   }, [clock, dispatchFact, source])
 
-  useEffect(
-    () =>
-      visibility.subscribe((change) =>
-        dispatchFact({
-          type: 'visibility',
-          occurredAt: change.occurredAt,
-          state: change.state,
-        }),
-      ),
-    [dispatchFact, visibility],
-  )
+  useEffect(() => {
+    dispatchFact({
+      type: 'visibility',
+      occurredAt: clock.now(),
+      state: visibility.getState(),
+    })
+    return visibility.subscribe((change) =>
+      dispatchFact({
+        type: 'visibility',
+        occurredAt: change.occurredAt,
+        state: change.state,
+      }),
+    )
+  }, [clock, dispatchFact, visibility])
 
   useEffect(() => {
     scheduler.cancelAll()
@@ -118,8 +145,8 @@ export function AppFlow({
   }, [dispatchFact, scheduler, state.lifecycle, state.runGeneration])
 
   useEffect(() => {
-    void wakeLock.setActive(wantsWakeLock(state.lifecycle.phase))
-  }, [state.lifecycle.phase, wakeLock])
+    void wakeLock.setActive(wakeLockActive)
+  }, [wakeLock, wakeLockActive])
 
   useEffect(
     () => () => {
@@ -138,7 +165,6 @@ export function AppFlow({
     if (next === selectedSource) return
     void source.disconnect()
     setSelectedSource(next)
-    dispatchFact({ type: 'sourceChanged', occurredAt: clock.now() })
   }
 
   const targetProps = {
@@ -206,6 +232,11 @@ export function AppFlow({
         run={run}
         telemetryStatus={state.telemetryStatus}
         paused={state.lifecycle.phase === 'suspended'}
+        suspensionReasons={
+          state.lifecycle.phase === 'suspended' ? state.lifecycle.reasons : []
+        }
+        pageVisible={state.pageVisibility === 'visible'}
+        canResume={canResumeMission(state)}
         hintEligible={hintEligibility.eligible}
         hintRemainingMs={hintEligibility.remainingMs}
         onRotate={(tileId) =>
@@ -226,6 +257,10 @@ export function AppFlow({
         }
         onResume={() =>
           dispatchFact({ type: 'manualResume', occurredAt: clock.now() })
+        }
+        onReconnect={() => void source.connect()}
+        onEndRun={() =>
+          dispatchFact({ type: 'backToBriefing', occurredAt: clock.now() })
         }
       />
     )

@@ -7,11 +7,15 @@ import { OperationalRangeGauge } from '../components/mission/OperationalRangeGau
 import { StationStabilityMeter } from '../components/mission/StationStabilityMeter'
 import { getMissionIntervalBehavior } from '../domain/mission/activeMission'
 import type { TelemetrySourceStatus } from '../telemetry/HeartRateTelemetrySource'
+import type { SuspensionReason } from '../app/AppState'
 
 interface ActiveMissionScreenProps {
   readonly run: MissionRun
   readonly telemetryStatus: TelemetrySourceStatus
   readonly paused: boolean
+  readonly suspensionReasons: readonly SuspensionReason[]
+  readonly pageVisible: boolean
+  readonly canResume: boolean
   readonly hintEligible: boolean
   readonly hintRemainingMs: number
   readonly onRotate: (tileId: string) => void
@@ -19,14 +23,21 @@ interface ActiveMissionScreenProps {
   readonly onReset: () => void
   readonly onPause: () => void
   readonly onResume: () => void
+  readonly onReconnect: () => void
+  readonly onEndRun: () => void
 }
 
 export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const interruptionHeadingRef = useRef<HTMLHeadingElement>(null)
   const resumeRef = useRef<HTMLButtonElement>(null)
+  const reconnectRef = useRef<HTMLButtonElement>(null)
   const pauseRef = useRef<HTMLButtonElement>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const wasPaused = useRef(props.paused)
+  const wasPaused = useRef(false)
+  const wasPageVisible = useRef(props.pageVisible)
+  const previousSuspensionReasons = useRef<readonly SuspensionReason[]>([])
+  const reconnectHadFocus = useRef(false)
   const mission = props.run.session.mission
 
   useEffect(() => {
@@ -35,17 +46,62 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
 
   useEffect(() => {
     const dialog = dialogRef.current
-    if (props.paused && dialog !== null) {
+    const newlyPaused = props.paused && !wasPaused.current
+    const newlyVisible = props.pageVisible && !wasPageVisible.current
+    const disconnectCleared =
+      previousSuspensionReasons.current.includes('disconnect') &&
+      !props.suspensionReasons.includes('disconnect')
+    if (props.paused && props.pageVisible && dialog !== null) {
       if (typeof dialog.showModal === 'function' && !dialog.open)
         dialog.showModal()
       else dialog.setAttribute('open', '')
-      resumeRef.current?.focus()
+      if (newlyPaused || newlyVisible) {
+        if (props.suspensionReasons.includes('disconnect')) {
+          reconnectRef.current?.focus()
+        } else if (props.suspensionReasons.includes('manual')) {
+          resumeRef.current?.focus()
+        } else {
+          interruptionHeadingRef.current?.focus()
+        }
+      } else if (disconnectCleared && reconnectHadFocus.current) {
+        reconnectHadFocus.current = false
+        if (props.canResume) resumeRef.current?.focus()
+        else interruptionHeadingRef.current?.focus()
+      }
     } else if (wasPaused.current) pauseRef.current?.focus()
     wasPaused.current = props.paused
-    return () => {
+    wasPageVisible.current = props.pageVisible
+    previousSuspensionReasons.current = props.suspensionReasons
+  }, [
+    props.canResume,
+    props.pageVisible,
+    props.paused,
+    props.suspensionReasons,
+  ])
+
+  useEffect(
+    () => () => {
+      const dialog = dialogRef.current
       if (dialog?.open && typeof dialog.close === 'function') dialog.close()
-    }
-  }, [props.paused])
+    },
+    [],
+  )
+
+  const disconnected = props.suspensionReasons.includes('disconnect')
+  const telemetryError =
+    props.telemetryStatus.state === 'error'
+      ? props.telemetryStatus.error.message
+      : null
+  const visibleReasons = props.suspensionReasons.filter(
+    (reason) => reason !== 'resumeRequired',
+  )
+  const reasonText: Record<SuspensionReason, string> = {
+    manual: 'You paused the mission.',
+    resumeRequired: 'Your confirmation is required before play continues.',
+    hidden: 'The page was hidden. Mission time stopped immediately.',
+    disconnect: 'The heart-rate monitor disconnected.',
+    staleSignal: 'No fresh heart-rate signal is available.',
+  }
 
   return (
     <main className="active-mission" aria-labelledby="active-mission-heading">
@@ -105,19 +161,108 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
       {props.paused ? (
         <dialog
           ref={dialogRef}
-          className="pause-dialog"
+          className="pause-dialog interruption-dialog"
           aria-labelledby="pause-heading"
           aria-describedby="pause-description"
           onCancel={(event) => event.preventDefault()}
+          onKeyDown={(event) => {
+            if (event.key !== 'Tab') return
+            const dialog = dialogRef.current
+            if (dialog === null) return
+            const controls = [...dialog.querySelectorAll('button')].filter(
+              (button) => !button.disabled,
+            )
+            const first = controls[0]
+            const last = controls.at(-1)
+            if (
+              event.shiftKey &&
+              document.activeElement === first &&
+              last !== undefined
+            ) {
+              event.preventDefault()
+              last.focus()
+            } else if (
+              !event.shiftKey &&
+              document.activeElement === last &&
+              first !== undefined
+            ) {
+              event.preventDefault()
+              first.focus()
+            }
+          }}
         >
           <p className="mission-eyebrow">Mission suspended</p>
-          <h2 id="pause-heading">Mission paused</h2>
+          <h2
+            ref={interruptionHeadingRef}
+            tabIndex={-1}
+            id="pause-heading"
+            onFocus={() => {
+              reconnectHadFocus.current = false
+            }}
+          >
+            Mission paused
+          </h2>
           <p id="pause-description">
             Mission time, station stability, classifications, and coolant
             controls are frozen.
           </p>
-          <button ref={resumeRef} type="button" onClick={props.onResume}>
+          <ul className="interruption-dialog__reasons">
+            {visibleReasons.map((reason) => (
+              <li key={reason}>{reasonText[reason]}</li>
+            ))}
+          </ul>
+          {visibleReasons.length === 0 ? (
+            <p>{reasonText.resumeRequired}</p>
+          ) : null}
+          {disconnected ? (
+            <>
+              {telemetryError === null ? null : (
+                <p id="reconnect-error" className="interruption-dialog__status">
+                  {telemetryError}
+                </p>
+              )}
+              <button
+                ref={reconnectRef}
+                type="button"
+                aria-describedby={
+                  telemetryError === null ? undefined : 'reconnect-error'
+                }
+                onFocus={() => {
+                  reconnectHadFocus.current = true
+                }}
+                onClick={props.onReconnect}
+              >
+                Reconnect monitor
+              </button>
+            </>
+          ) : null}
+          <button
+            ref={resumeRef}
+            type="button"
+            aria-disabled={!props.canResume}
+            onFocus={() => {
+              reconnectHadFocus.current = false
+            }}
+            onClick={() => {
+              if (props.canResume) props.onResume()
+            }}
+          >
             Resume mission
+          </button>
+          {!props.canResume ? (
+            <p className="interruption-dialog__status">
+              Resume becomes available when the page is visible and a fresh,
+              stable heart-rate signal is connected.
+            </p>
+          ) : null}
+          <button
+            type="button"
+            onFocus={() => {
+              reconnectHadFocus.current = false
+            }}
+            onClick={props.onEndRun}
+          >
+            End run
           </button>
         </dialog>
       ) : null}

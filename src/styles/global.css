@@ -217,6 +217,29 @@ button:disabled {
   font-weight: 800;
 }
 
+.interruption-dialog__reasons {
+  margin: 1rem 0;
+  padding-left: 1.25rem;
+  line-height: 1.5;
+}
+
+.interruption-dialog__status {
+  margin: 0.75rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.interruption-dialog [aria-disabled='true'] {
+  opacity: 0.62;
+}
+
+@media (forced-colors: active) {
+  .interruption-dialog [aria-disabled='true'] {
+    border-style: dashed;
+    opacity: 1;
+  }
+}
+
 @media (min-width: 44rem) {
   .active-mission__critical {
     grid-template-columns: minmax(0, 1.2fr) minmax(16rem, 0.8fr);

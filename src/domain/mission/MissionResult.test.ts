@@ -7,6 +7,7 @@ import {
   validateMissionResult,
   type MissionResult,
 } from './MissionResult'
+import { buildMissionResult } from '../../test/missionResultBuilder'
 
 function validResult(): MissionResult {
   return {
@@ -232,5 +233,43 @@ describe('MissionResult serialization and runtime validation', () => {
 
   it('rejects invalid JSON', () => {
     expect(() => deserializeMissionResult('{not-json')).toThrow(RangeError)
+  })
+
+  it('contains only finite plain serializable data and round trips supported boundary values', () => {
+    const result = buildMissionResult({
+      startedAtTimeMs: 0,
+      finalizedAtTimeMs: 60_000,
+      missionDurationMs: 60_000,
+      suspendedDurationMs: 0,
+      unclassifiedDurationMs: 0,
+      unusableSignalDurationMs: 0,
+      pauseCount: 0,
+      disconnectCount: 0,
+      disconnectedDurationMs: 0,
+      lowOutputEpisodeCount: 0,
+      overloadEpisodeCount: 0,
+      endingStability: 100,
+      puzzleMoveCount: 0,
+      hintUsed: false,
+    })
+    const seen = new Set<unknown>()
+    const inspect = (value: unknown): void => {
+      expect(typeof value).not.toBe('function')
+      expect(typeof value).not.toBe('symbol')
+      if (typeof value === 'number') expect(Number.isFinite(value)).toBe(true)
+      if (typeof value !== 'object' || value === null) return
+      expect(value).not.toBeInstanceOf(Map)
+      expect(value).not.toBeInstanceOf(Set)
+      expect(
+        Array.isArray(value) ||
+          Object.getPrototypeOf(value) === Object.prototype,
+      ).toBe(true)
+      if (seen.has(value)) throw new Error('Mission result must not be cyclic')
+      seen.add(value)
+      for (const child of Object.values(value)) inspect(child)
+    }
+
+    inspect(result)
+    expect(deserializeMissionResult(JSON.stringify(result))).toEqual(result)
   })
 })

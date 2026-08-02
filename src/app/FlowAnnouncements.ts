@@ -74,6 +74,14 @@ export function announcementForActiveRunTransition(
   fallback: string,
   tuning: FlowAnnouncementTuning,
 ): string {
+  if (
+    before.session.mission.status.phase === 'ongoing' &&
+    after.session.mission.status.phase === 'finalized'
+  ) {
+    return after.session.mission.status.outcome === 'success'
+      ? 'Mission complete'
+      : 'Reactor failure'
+  }
   const announcements: string[] = []
   const previousClassification = before.classifier.stableClassification
   const currentClassification = after.classifier.stableClassification

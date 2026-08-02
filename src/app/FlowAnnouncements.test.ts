@@ -237,7 +237,7 @@ describe('flow announcements', () => {
     expect(selectedTuning).toEqual(tuningSnapshot)
   })
 
-  it('keeps paused and finalized outcome changes silent in this policy', () => {
+  it('keeps pauses silent and announces each finalized outcome once', () => {
     const active = runWith({ classification: 'above', stability: 70 })
     const paused = runWith({
       classification: 'above',
@@ -251,7 +251,7 @@ describe('flow announcements', () => {
         runWith({ stability: 100 }),
         runWith({ stability: 100, outcome: 'success' }),
       ),
-    ).toBe('Existing announcement')
+    ).toBe('Mission complete')
     expect(
       announce(
         runWith({ classification: 'above', stability: 0 }),
@@ -261,7 +261,7 @@ describe('flow announcements', () => {
           outcome: 'failure',
         }),
       ),
-    ).toBe('Existing announcement')
+    ).toBe('Reactor failure')
   })
 
   it('uses the existing telemetry status wording', () => {

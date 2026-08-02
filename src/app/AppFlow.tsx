@@ -12,6 +12,7 @@ import { PreMissionScreen } from '../features/PreMissionScreen'
 import { WarmupScreen } from '../features/WarmupScreen'
 import { LifecycleScreen } from '../features/LifecycleScreen'
 import { ActiveMissionScreen } from '../features/ActiveMissionScreen'
+import { MissionResultPanel } from '../features/mission-result/MissionResultPanel'
 import type { MonotonicClock } from '../platform/Clock'
 import type { PageVisibility } from '../platform/PageVisibility'
 import type { Scheduler } from '../platform/Scheduler'
@@ -264,6 +265,8 @@ export function AppFlow({
         }
       />
     )
+  } else if (state.lifecycle.phase === 'result') {
+    screen = <MissionResultPanel result={state.lifecycle.result} />
   } else {
     screen = (
       <LifecycleScreen

@@ -481,7 +481,7 @@ describe('mission flow controller', () => {
     expect(state.announcement).toBe(holdingAnnouncement)
   })
 
-  it('announces each established stability threshold once and leaves failure to the focused result transition', () => {
+  it('announces each established stability threshold and the final failure once', () => {
     let state = enterActiveMission()
     let previousAnnouncement = state.announcement
     const announcements: string[] = []
@@ -499,6 +499,7 @@ describe('mission flow controller', () => {
       'Station stability warning: 75 percent',
       'Station stability critical: 50 percent',
       'Station stability critical: 25 percent',
+      'Reactor failure',
     ])
     expect(state.lifecycle.phase).toBe('result')
     if (state.lifecycle.phase === 'result') {

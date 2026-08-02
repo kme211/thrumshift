@@ -4,10 +4,13 @@ import { describe, expect, it } from 'vitest'
 import type { AppState } from '../app/AppState'
 import { createWarmupSession, type WarmupSession } from '../app/WarmupSession'
 import { defaultGameplayTuning } from '../config/gameplayTuning'
-import type { ShellMissionState, ShellResult } from '../app/ShellState'
+import type { ShellMissionState } from '../app/ShellState'
 import { LifecycleScreen } from './LifecycleScreen'
 
-type State = AppState<WarmupSession, ShellMissionState, ShellResult>
+type State = Exclude<
+  AppState<WarmupSession, ShellMissionState, never>,
+  { readonly phase: 'result' }
+>
 const runId = 'run-shell'
 const warmup = createWarmupSession(
   0,
@@ -22,14 +25,6 @@ describe('LifecycleScreen', () => {
     [{ phase: 'warming', runId, warmup }, 'Warm-up'],
     [{ phase: 'countdown', runId, warmup }, 'Mission countdown'],
     [{ phase: 'activeMission', runId, mission }, 'Reactor Cooling Failure'],
-    [
-      { phase: 'result', runId, result: { outcome: 'success' } },
-      'Mission successful',
-    ],
-    [
-      { phase: 'result', runId, result: { outcome: 'failure' } },
-      'Mission failed',
-    ],
   ])(
     'renders a labeled region and focused heading for %#',
     (state, heading) => {

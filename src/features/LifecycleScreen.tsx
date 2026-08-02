@@ -3,10 +3,9 @@ import { useEffect, useRef } from 'react'
 import type { AppState } from '../app/AppState'
 import type { WarmupSession } from '../app/WarmupSession'
 
-type ShellAppState = AppState<
-  WarmupSession,
-  unknown,
-  { readonly outcome: 'success' | 'failure' }
+type ShellAppState = Exclude<
+  AppState<WarmupSession, unknown, never>,
+  { readonly phase: 'result' }
 >
 
 interface ScreenContent {
@@ -52,27 +51,12 @@ function getScreenContent(state: ShellAppState): ScreenContent {
           'Progress is suspended. Resolve every listed blocker before choosing the appropriate recovery action.',
       }
     }
-    case 'result':
-      return state.result.outcome === 'success'
-        ? {
-            eyebrow: 'Mission result',
-            heading: 'Mission successful',
-            description:
-              'Detailed performance metrics and rating are intentionally deferred.',
-          }
-        : {
-            eyebrow: 'Mission result',
-            heading: 'Mission failed',
-            description:
-              'Detailed performance metrics and rating are intentionally deferred.',
-          }
   }
 }
 
 function getFocusKey(state: ShellAppState): string {
   if (state.phase === 'suspended')
     return `${state.phase}:${state.reasons.join(',')}`
-  if (state.phase === 'result') return `${state.phase}:${state.result.outcome}`
   return state.phase
 }
 

@@ -26,106 +26,163 @@ export function PreMissionScreen(props: PreMissionScreenProps) {
   const headingRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => headingRef.current?.focus(), [])
   const unsupported = !props.capability.supported
+  const linkState = unsupported ? 'unavailable' : props.status.state
   return (
     <section
-      className="mx-auto max-w-3xl transition-colors duration-300"
+      className="pre-mission transition-colors duration-300"
       aria-labelledby="screen-heading"
     >
-      <div className="border border-[var(--color-border)] bg-[var(--color-surface)] p-6 sm:p-10">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
-          Stay in range. Keep the station alive.
-        </p>
-        <p className="mt-3 text-lg font-bold">Thrumshift</p>
-        <p className="mt-8 text-sm uppercase tracking-widest text-[var(--color-text-muted)]">
-          Mission briefing
-        </p>
-        <h1
-          ref={headingRef}
-          id="screen-heading"
-          tabIndex={-1}
-          className="mt-2 text-3xl font-semibold sm:text-5xl"
-        >
-          Reactor Cooling Failure
-        </h1>
-        <p className="mt-3 max-w-prose leading-7 text-[var(--color-text-muted)]">
-          Keep your movement steady while you restore the station’s cooling
-          controls.
-        </p>
+      <div className="equipment-shell pre-mission__shell">
+        <div className="equipment-shell__fasteners" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+
+        <header className="pre-mission__header">
+          <div className="pre-mission__identity">
+            <p className="equipment-kicker">
+              <span>Thrumshift</span> / Station 04
+            </p>
+            <p className="mission-eyebrow">Mission briefing</p>
+            <h1 ref={headingRef} id="screen-heading" tabIndex={-1}>
+              Reactor Cooling Failure
+            </h1>
+            <p className="pre-mission__summary">
+              Keep your movement steady while you restore the station’s cooling
+              controls.
+            </p>
+          </div>
+          <p className="pre-mission__motto">
+            Stay in range. Keep the station alive.
+          </p>
+        </header>
 
         {props.showSourceSelector ? (
-          <fieldset className="mt-6 flex flex-wrap gap-4">
-            <legend className="font-semibold">
-              Development telemetry source
-            </legend>
-            {(['simulated', 'bluetooth'] as const).map((source) => (
-              <label key={source}>
-                <input
-                  type="radio"
-                  name="product-source"
-                  checked={props.selectedSource === source}
-                  onChange={() => props.onSelectSource(source)}
-                />{' '}
-                {source === 'simulated' ? 'Simulator' : 'Web Bluetooth'}
-              </label>
-            ))}
+          <fieldset className="pre-mission__source-selector">
+            <legend>Development telemetry source</legend>
+            <div>
+              {(['simulated', 'bluetooth'] as const).map((source) => (
+                <label key={source}>
+                  <input
+                    type="radio"
+                    name="product-source"
+                    checked={props.selectedSource === source}
+                    onChange={() => props.onSelectSource(source)}
+                  />
+                  <span>
+                    {source === 'simulated' ? 'Simulator' : 'Web Bluetooth'}
+                  </span>
+                </label>
+              ))}
+            </div>
           </fieldset>
         ) : null}
 
-        <div className="mt-6 border-l-4 border-[var(--color-accent)] pl-4">
-          <h2 className="font-semibold">Operator bio-link</h2>
-          <p className="mt-1">
-            Connection: <strong>{props.status.state}</strong>
-          </p>
-          {props.status.state === 'error' ? (
-            <p className="mt-1">{props.status.error.message}</p>
-          ) : null}
-          {unsupported ? (
-            <p className="mt-2" role="status">
-              {props.capability.reason === 'insecure-context'
-                ? 'Web Bluetooth requires HTTPS or localhost.'
-                : 'Web Bluetooth is unavailable in this browser. Use supported Chrome on Android.'}
-            </p>
-          ) : null}
-          <output
-            className="mt-3 block text-4xl font-bold"
-            aria-label="Latest heart rate"
+        <div className="pre-mission__console">
+          <section
+            className="equipment-module pre-mission__bio-link"
+            aria-label="Operator bio-link"
           >
-            {props.latestBpm ?? '—'} <span className="text-base">BPM</span>
-          </output>
-          <button
-            className="mt-4"
-            type="button"
-            disabled={unsupported || props.status.state === 'connecting'}
-            onClick={props.onConnect}
+            <div className="equipment-label" aria-hidden="true">
+              <span>Operator bio-link</span>
+              <span>
+                BL-01 / {linkState === 'connected' ? 'LINKED' : 'STANDBY'}
+              </span>
+            </div>
+            <div className="crt-display crt-display--briefing">
+              <div
+                className="pre-mission__link-state"
+                data-link-state={linkState}
+              >
+                <span className="bio-link-status__lamp" aria-hidden="true" />
+                <p>
+                  Connection: <strong>{linkState}</strong>
+                </p>
+              </div>
+              {props.status.state === 'error' ? (
+                <p className="pre-mission__link-message">
+                  {props.status.error.message}
+                </p>
+              ) : null}
+              {unsupported ? (
+                <p className="pre-mission__link-message" role="status">
+                  {props.capability.reason === 'insecure-context'
+                    ? 'Web Bluetooth requires HTTPS or localhost.'
+                    : 'Web Bluetooth is unavailable in this browser. Use supported Chrome on Android.'}
+                </p>
+              ) : null}
+              <div className="pre-mission__bpm-readout">
+                <span>Latest signal</span>
+                <output aria-label="Latest heart rate">
+                  {props.latestBpm ?? '—'} <small>BPM</small>
+                </output>
+              </div>
+            </div>
+            <button
+              className="equipment-button pre-mission__connect"
+              type="button"
+              disabled={unsupported || props.status.state === 'connecting'}
+              onClick={props.onConnect}
+            >
+              {props.selectedSource === 'simulated'
+                ? 'Connect simulator'
+                : props.status.state === 'error'
+                  ? 'Retry heart-rate monitor'
+                  : 'Choose heart-rate monitor'}
+            </button>
+          </section>
+
+          <section
+            className="equipment-module pre-mission__parameters"
+            aria-label="Mission parameters"
           >
-            {props.selectedSource === 'simulated'
-              ? 'Connect simulator'
-              : props.status.state === 'error'
-                ? 'Retry heart-rate monitor'
-                : 'Choose heart-rate monitor'}
-          </button>
+            <div className="equipment-label" aria-hidden="true">
+              <span>Mission parameters</span>
+              <span>RC-04 / PREP</span>
+            </div>
+            <div className="pre-mission__parameter-sheet">
+              <TargetRangeFields
+                lower={props.targetDraft.lower}
+                upper={props.targetDraft.upper}
+                error={props.targetError}
+                variant="equipment"
+                onChange={props.onTargetChange}
+                onCommit={props.onTargetCommit}
+              />
+              <p className="pre-mission__safety-note">
+                <strong>Operator advisory</strong>
+                Thrumshift does not provide a medical target. Choose a
+                comfortable gameplay range appropriate for you. Move safely in a
+                clear area; stop if you feel unwell.
+              </p>
+            </div>
+          </section>
         </div>
 
-        <TargetRangeFields
-          lower={props.targetDraft.lower}
-          upper={props.targetDraft.upper}
-          error={props.targetError}
-          onChange={props.onTargetChange}
-          onCommit={props.onTargetCommit}
-        />
-        <p className="mt-5 text-sm text-[var(--color-text-muted)]">
-          Thrumshift does not provide a medical target. Choose a comfortable
-          gameplay range appropriate for you. Move safely in a clear area; stop
-          if you feel unwell.
-        </p>
-        <button
-          className="mt-6 w-full text-lg font-semibold"
-          type="button"
-          disabled={!props.canBegin}
-          onClick={props.onBegin}
-        >
-          Begin Warm-Up
-        </button>
+        <footer className="control-deck pre-mission__control-deck">
+          <div className="control-deck__legend" aria-hidden="true">
+            <span>MISSION COMMISSIONING</span>
+            <strong>LOCAL AUTHORITY</strong>
+          </div>
+          <div
+            className="control-deck__state pre-mission__ready-state"
+            data-ready={props.canBegin}
+            aria-hidden="true"
+          >
+            <span className="status-lamp" />
+            {props.canBegin ? 'WARM-UP READY' : 'SETUP REQUIRED'}
+          </div>
+          <button
+            className="equipment-button pre-mission__begin"
+            type="button"
+            disabled={!props.canBegin}
+            onClick={props.onBegin}
+          >
+            Begin Warm-Up
+          </button>
+        </footer>
       </div>
     </section>
   )

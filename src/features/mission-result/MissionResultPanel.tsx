@@ -18,14 +18,16 @@ function MetricList({
   }[]
 }) {
   return (
-    <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+    <dl className="result-metrics">
       {metrics.map(({ label, value, accessibleValue }) => (
         <div
           key={label}
-          className="min-w-0 border border-[var(--color-border)] p-4"
+          className="result-metric min-w-0"
+          data-metric={label}
+          data-value={value}
         >
-          <dt className="text-sm text-[var(--color-text-muted)]">{label}</dt>
-          <dd className="mt-1 break-words text-lg font-semibold">
+          <dt>{label}</dt>
+          <dd className="break-words">
             <span
               aria-hidden={accessibleValue === undefined ? undefined : true}
             >
@@ -50,114 +52,163 @@ export function MissionResultPanel({
 
   useEffect(() => headingRef.current?.focus(), [])
 
+  const successful = view.outcome === 'success'
+
   return (
     <section
-      className="mx-auto max-w-3xl transition-colors duration-300"
+      className="mission-result transition-colors duration-300"
       aria-labelledby="result-heading"
       data-outcome={view.outcome}
     >
-      <div className="border border-[var(--color-border)] bg-[var(--color-surface)] p-6 sm:p-10">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
-          Mission result
-        </p>
-        <h1
-          ref={headingRef}
-          id="result-heading"
-          tabIndex={-1}
-          className="mt-2 text-3xl font-semibold outline-none sm:text-5xl"
-        >
-          {view.heading}
-        </h1>
-        <p className="mt-3 max-w-prose leading-7 text-[var(--color-text-muted)]">
-          {view.summary}
-        </p>
-
-        <div className="mt-8 border-l-4 border-[var(--color-accent)] pl-4">
-          <p className="text-sm text-[var(--color-text-muted)]">
-            {view.duration.label}
-          </p>
-          <p className="mt-1 text-4xl font-bold">
-            <span aria-hidden="true">{view.duration.value}</span>
-            <span className="sr-only">{view.duration.accessibleValue}</span>
-          </p>
+      <div className="equipment-shell mission-result__shell">
+        <div className="equipment-shell__fasteners" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
         </div>
 
-        <section className="mt-8" aria-labelledby="result-overview-heading">
-          <h2 id="result-overview-heading" className="text-xl font-semibold">
-            Mission overview
-          </h2>
-          <MetricList metrics={view.coreMetrics} />
-          <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-            BPM means beats per minute.
-          </p>
-        </section>
-
-        <section className="mt-8" aria-labelledby="range-breakdown-heading">
-          <h2 id="range-breakdown-heading" className="text-xl font-semibold">
-            Time in gameplay range
-          </h2>
-          {view.rangeMetrics === null ? null : (
-            <MetricList metrics={view.rangeMetrics} />
-          )}
-          <p className="mt-3 max-w-prose text-sm leading-6 text-[var(--color-text-muted)]">
-            {view.rangeExplanation}
-          </p>
-          {view.signalExplanation === null ? null : (
-            <p className="mt-3 border-l-4 border-[var(--color-border)] pl-4 leading-6">
-              {view.signalExplanation}
+        <header className="mission-result__header">
+          <div>
+            <p className="equipment-kicker">
+              <span>Thrumshift</span> / Station 04
             </p>
-          )}
-          {view.signalMetrics.length === 0 ? null : (
-            <MetricList metrics={view.signalMetrics} />
-          )}
-        </section>
+            <p className="mission-eyebrow">Mission result</p>
+            <p className="mission-result__mission-name">
+              Reactor Cooling Failure
+            </p>
+          </div>
+          <div className="mission-result__seal" aria-hidden="true">
+            <span className="status-lamp" />
+            <span>
+              REPORT SEALED
+              <small>RUN ARCHIVE COMPLETE</small>
+            </span>
+          </div>
+        </header>
 
-        <section className="mt-8" aria-labelledby="events-heading">
-          <h2 id="events-heading" className="text-xl font-semibold">
-            Mission events
-          </h2>
-          <MetricList metrics={view.eventMetrics} />
-        </section>
-
-        <section className="mt-8" aria-labelledby="puzzle-summary-heading">
-          <h2 id="puzzle-summary-heading" className="text-xl font-semibold">
-            Coolant routing
-          </h2>
-          <MetricList metrics={view.puzzleMetrics} />
-        </section>
-
-        {view.interruptionMetrics.length === 0 ? null : (
-          <section className="mt-8" aria-labelledby="interruptions-heading">
-            <h2 id="interruptions-heading" className="text-xl font-semibold">
-              Interruptions
-            </h2>
-            <MetricList metrics={view.interruptionMetrics} />
+        <div className="mission-result__console">
+          <section
+            className="equipment-module mission-result__disposition"
+            aria-label="Mission disposition"
+          >
+            <div className="equipment-label" aria-hidden="true">
+              <span>Mission disposition</span>
+              <span>MR-04 / {successful ? 'RESTORED' : 'DEPLETED'}</span>
+            </div>
+            <div className="crt-display crt-display--result">
+              <div className="mission-result__state" aria-hidden="true">
+                <span className="status-lamp" />
+                {successful ? 'SYSTEM RESTORED' : 'STABILITY DEPLETED'}
+              </div>
+              <h1 ref={headingRef} id="result-heading" tabIndex={-1}>
+                {view.heading}
+              </h1>
+              <p className="mission-result__summary">{view.summary}</p>
+              <div className="mission-result__duration">
+                <p>{view.duration.label}</p>
+                <strong>
+                  <span aria-hidden="true">{view.duration.value}</span>
+                  <span className="sr-only">
+                    {view.duration.accessibleValue}
+                  </span>
+                </strong>
+              </div>
+            </div>
           </section>
-        )}
 
-        <section
-          className="mt-8 border border-[var(--color-border)] p-5"
-          aria-labelledby="rating-heading"
-        >
-          <h2 id="rating-heading" className="text-xl font-semibold">
-            Performance rating
-          </h2>
-          <p className="mt-2 text-2xl font-bold">{view.rating.label}</p>
-          <p className="mt-2 max-w-prose leading-6">
-            {view.rating.explanation}
-          </p>
-          <p className="mt-3 max-w-prose text-sm leading-6 text-[var(--color-text-muted)]">
-            {view.rating.criteria}
-          </p>
-        </section>
+          <section
+            className="equipment-module mission-result__record"
+            aria-label="Mission archive"
+          >
+            <div className="equipment-label" aria-hidden="true">
+              <span>Mission archive</span>
+              <span>AR-04 / SEALED</span>
+            </div>
+            <div className="mission-result__ledger">
+              <section aria-labelledby="result-overview-heading">
+                <h2 id="result-overview-heading">Mission overview</h2>
+                <MetricList metrics={view.coreMetrics} />
+                <p className="mission-result__note">
+                  BPM means beats per minute.
+                </p>
+              </section>
 
-        <button
-          className="mt-8 w-full text-lg font-semibold"
-          type="button"
-          onClick={onRunAgain}
-        >
-          Run Again
-        </button>
+              <section aria-labelledby="range-breakdown-heading">
+                <h2 id="range-breakdown-heading">Time in gameplay range</h2>
+                {view.rangeMetrics === null ? null : (
+                  <MetricList metrics={view.rangeMetrics} />
+                )}
+                <p className="mission-result__note">{view.rangeExplanation}</p>
+                {view.signalExplanation === null ? null : (
+                  <p className="mission-result__signal-note">
+                    {view.signalExplanation}
+                  </p>
+                )}
+                {view.signalMetrics.length === 0 ? null : (
+                  <MetricList metrics={view.signalMetrics} />
+                )}
+              </section>
+
+              <section aria-labelledby="events-heading">
+                <h2 id="events-heading">Mission events</h2>
+                <MetricList metrics={view.eventMetrics} />
+              </section>
+
+              <section aria-labelledby="puzzle-summary-heading">
+                <h2 id="puzzle-summary-heading">Coolant routing</h2>
+                <MetricList metrics={view.puzzleMetrics} />
+              </section>
+
+              {view.interruptionMetrics.length === 0 ? null : (
+                <section aria-labelledby="interruptions-heading">
+                  <h2 id="interruptions-heading">Interruptions</h2>
+                  <MetricList metrics={view.interruptionMetrics} />
+                </section>
+              )}
+            </div>
+          </section>
+
+          <section
+            className="equipment-module mission-result__rating"
+            aria-labelledby="rating-heading"
+          >
+            <div className="equipment-label" aria-hidden="true">
+              <span>Performance classification</span>
+              <span>PC-04 / FINAL</span>
+            </div>
+            <div className="mission-result__rating-sheet">
+              <h2 id="rating-heading">Performance rating</h2>
+              <p className="mission-result__rating-value">
+                {view.rating.label}
+              </p>
+              <p className="mission-result__rating-explanation">
+                {view.rating.explanation}
+              </p>
+              <p className="mission-result__rating-criteria">
+                {view.rating.criteria}
+              </p>
+            </div>
+          </section>
+        </div>
+
+        <footer className="control-deck mission-result__control-deck">
+          <div className="control-deck__legend" aria-hidden="true">
+            <span>MISSION RECORD BUS</span>
+            <strong>ARCHIVE COMMITTED</strong>
+          </div>
+          <div className="control-deck__state" aria-hidden="true">
+            <span className="status-lamp" />
+            RUN CLOSED
+          </div>
+          <button
+            className="equipment-button mission-result__run-again"
+            type="button"
+            onClick={onRunAgain}
+          >
+            Run Again
+          </button>
+        </footer>
       </div>
     </section>
   )

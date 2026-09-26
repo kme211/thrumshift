@@ -29,6 +29,9 @@ Possible implementations
 - Door transitions
 - Corridor cards
 - Room hero scenes
+- Equipment bays
+- Airlocks
+- Maintenance tunnels
 
 References
 
@@ -47,9 +50,10 @@ Ideas
 
 - Room-specific lighting
 - Ambient audio
-- Maintenance history
 - Unique consoles
 - Distinct layouts
+- Recognizable landmarks
+- Department-specific equipment
 
 ---
 
@@ -79,6 +83,7 @@ Examples
 - Power affects lighting.
 - Cooling affects reactor output.
 - Communications affect telemetry quality.
+- Environmental failures cascade into secondary problems.
 
 ---
 
@@ -92,6 +97,8 @@ Examples
 - Shutdown procedures
 - Safety interlocks
 - Verification steps
+- Lockout procedures
+- Keyed overrides
 
 ---
 
@@ -125,6 +132,7 @@ Examples
 - One player operates.
 - Permission-based actions.
 - Guided repairs.
+- Cross-room coordination.
 
 ---
 
@@ -142,6 +150,46 @@ Ideas
 - Crew photographs
 - Calibration records
 - Personal workstations
+- Functional instructional signage
+- Controls labeled by outcome rather than component
+- Layered signage readable from multiple distances
+- Department and subsystem identity signs
+- Equipment identification plates
+
+### Physical Access Procedures
+
+Status: Future
+
+Critical systems require believable physical access before maintenance begins.
+
+Ideas
+
+- Maintenance tools
+- Fasteners or latches
+- Access panels
+- Multi-step opening procedures
+- Internal service bays
+- Reassembly after repair
+
+Reference
+
+2001: A Space Odyssey — HAL Logic Memory Center
+
+### Serviceable Infrastructure
+
+Critical systems are built to be repaired rather than hidden.
+
+Ideas
+
+- Numbered modules
+- Replaceable components
+- Organized maintenance bays
+- Clearly named subsystems
+- Visible service architecture
+
+Reference
+
+- 2001: A Space Odyssey — Logic Memory Center
 
 ---
 
@@ -156,6 +204,80 @@ Ideas
 - Coffee mugs
 - Checklists
 - Personal notes
+- Worn equipment
+- Repaired hardware
+
+---
+
+## Industrial Language
+
+Systems are described the way engineers would describe them.
+
+Examples
+
+- Coolant Pump
+- Communication Power
+- Airlock Equalization
+- Power Bus Isolation
+- Explosive Bolts
+
+Avoid vague sci-fi terminology when realistic engineering language is stronger.
+
+## Maintenance Signage
+
+Status: Future
+
+Industrial labeling reinforces that the station is a real workplace.
+
+Ideas
+
+Equipment identifiers
+Service access labels
+Operational restrictions
+Calibration markings
+Emergency procedures
+Inspection dates
+Asset numbers
+Connector diagrams
+
+References
+
+2001: A Space Odyssey
+Alien
+The Andromeda Strain
+
+---
+
+# Worldbuilding
+
+## Living on the Station
+
+Ideas that make the station feel inhabited over years rather than days.
+
+Ideas
+
+- Long-term effects of closed-loop life support.
+- Crew rituals and routines.
+- Environmental adaptations.
+- Small occupational health issues.
+- Engineering folklore.
+- Department culture.
+- Everyday maintenance habits.
+
+---
+
+## Station Culture
+
+Ideas that communicate how people work aboard the station.
+
+Ideas
+
+- Naming conventions.
+- Shift traditions.
+- Informal procedures.
+- Tool ownership.
+- Crew shorthand.
+- Operational etiquette.
 
 ---
 
@@ -186,6 +308,27 @@ Examples
 - Pumps stop.
 - Relays engage.
 - Lighting buzz changes.
+- Machinery quiets after shutdown.
+
+---
+
+## Layered Alarm States
+
+Status: Future
+
+Each subsystem contributes independent audio based on its state.
+
+Ideas
+
+Armed pulse continues during alarms.
+Reactor hum changes with load.
+Ventilation remains audible unless it actually fails.
+Relay clicks continue during emergencies.
+New alerts layer onto existing sounds rather than replacing them.
+
+Reference
+
+2001: A Space Odyssey
 
 ---
 
@@ -198,6 +341,23 @@ Existing instruments gain new meaning during emergencies.
 Reference
 
 - The Andromeda Strain countdown clock
+
+### Operational Dashboards
+
+Station displays summarize subsystem health without requiring interaction.
+
+Ideas
+
+- Fleet status
+- Repair queue
+- Power generation
+- Environmental health
+- Communications status
+- Equipment utilization
+
+Reference
+
+- Moon
 
 ---
 
@@ -215,10 +375,46 @@ Reference
 
 Controls reflect subsystem state.
 
-Reference
+Examples
+
+- Indicator lamps
+- Toggle switches
+- Keyed controls
+- Status lights
+
+References
 
 - Alien
 - The Andromeda Strain
+- 2001: A Space Odyssey
+
+---
+
+## Station Response
+
+Interactions affect the surrounding environment.
+
+Ideas
+
+- Lights change.
+- Relays click.
+- Fans spin up.
+- CRTs warm.
+- Indicator lamps change.
+- Nearby equipment reacts.
+- Rooms subtly change as systems come online.
+
+## Progressive Failure Visualization
+
+Subsystem displays should degrade before presenting textual alarms.
+
+Ideas
+
+- Graphs become unstable.
+- Values drift.
+- Indicators disappear.
+- Signals flatline.
+- Text warnings appear only after instrumentation shows failure.
 
 ---
 
@@ -236,7 +432,14 @@ Maintenance decisions accumulate.
 
 Systems remember previous repairs.
 
-Repeated failures become more likely until deeper maintenance occurs.
+Ideas
+
+- Maintenance history.
+- Repeat failures.
+- Temporary fixes.
+- Long-term degradation.
+- Equipment age.
+- Deferred maintenance.
 
 ---
 
@@ -264,7 +467,7 @@ Ideas
 
 ---
 
-# Nice-to-Have
+# Miscellaneous
 
 Ideas that don't currently belong anywhere else.
 

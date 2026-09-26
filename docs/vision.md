@@ -98,6 +98,12 @@ Escalation should happen gradually.
 - Hardware is substantial; graphics are simple.
 - The station feels maintained, not pristine.
 - Alerts compete for attention in proportion to the action they require.
+- Systems are named for what they do, not what they are.
+- Spaces are labeled for operators, not for players.
+- Each system owns its own sound. Emergencies layer together rather than restarting the soundscape.
+- Labels describe what an operator is about to do.
+- Lighting defines space before decoration does.
+- Use task lighting, ambient lighting, and accent lighting to communicate purpose, navigation, and mood.
 
 ---
 
@@ -177,6 +183,12 @@ The station exists to serve the interests of its founder rather than humanity as
 Players slowly uncover its history through everyday operation instead of exposition.
 
 Story emerges from maintenance records, inspection stickers, subsystem naming, environmental details, and the changing condition of the station.
+
+---
+
+# Naming Principle
+
+Thrumshift is the name of the game and broader setting. Individual facilities have their own identities, names, histories, and personalities.
 
 ---
 

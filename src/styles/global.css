@@ -246,6 +246,8 @@ button:disabled {
 }
 
 .crt-display {
+  --crt-inner-frame: 0.42rem;
+  --crt-outer-frame: 0.28rem;
   position: relative;
   isolation: isolate;
   min-width: 0;
@@ -260,11 +262,11 @@ button:disabled {
       var(--display-glass) 70%
     );
   box-shadow:
-    inset 0 0 0 0.42rem #11130f,
+    inset 0 0 0 var(--crt-inner-frame) #11130f,
     inset 0 1px rgb(225 216 184 / 0.12),
     inset 0 0 1.15rem rgb(0 0 0 / 0.58),
     inset 0 0 3.6rem rgb(0 0 0 / 0.72),
-    0 0 0 0.28rem #161712,
+    0 0 0 var(--crt-outer-frame) #161712,
     0 0.22rem 0 #070806;
 }
 
@@ -845,20 +847,100 @@ button:disabled {
 }
 
 @media (max-width: 43.99rem) {
+  .equipment-shell {
+    padding: 0.45rem;
+    border-radius: 0.22rem;
+    box-shadow:
+      inset 0 1px rgb(255 255 255 / 0.07),
+      inset 0 -2px rgb(0 0 0 / 0.5),
+      0 0 0 0.18rem #121411;
+  }
+
+  .equipment-shell__fasteners {
+    display: none;
+  }
+
   .active-mission__header {
     align-items: stretch;
+    gap: 0.65rem;
+    margin-bottom: 0.7rem;
+    padding: 0.2rem 0.3rem 0.7rem;
+  }
+
+  .equipment-kicker {
+    margin-bottom: 0.5rem;
+  }
+
+  .active-mission h1 {
+    font-size: clamp(1.65rem, 8vw, 2rem);
   }
 
   .bio-link-status {
     width: 100%;
+    min-height: 2.7rem;
+    padding: 0.45rem 0.65rem;
+  }
+
+  .bio-link-status strong,
+  .bio-link-status small {
+    display: inline;
+  }
+
+  .bio-link-status small {
+    margin: 0;
+  }
+
+  .bio-link-status small::before {
+    color: #6f7162;
+    content: ' / ';
+  }
+
+  .active-mission__console {
+    gap: 0.7rem;
+  }
+
+  .equipment-module {
+    padding: 0.4rem;
+  }
+
+  .equipment-label {
+    width: 100%;
+    margin-bottom: 0.45rem;
+    padding: 0.38rem 0.5rem;
+  }
+
+  .crt-display {
+    --crt-inner-frame: 0.32rem;
+    --crt-outer-frame: 0.18rem;
+    border-radius: 0.5rem;
+  }
+
+  .crt-display--telemetry,
+  .crt-display--schematic {
+    padding: 0.8rem;
+  }
+
+  .active-mission__instructions {
+    margin: 0.7rem 0.35rem 0.15rem;
+  }
+
+  .coolant-board {
+    margin-top: 0.8rem;
   }
 
   .control-deck {
     grid-template-columns: 1fr auto;
+    gap: 0.7rem;
+    margin-top: 0.7rem;
+    padding: 0.6rem;
   }
 
   .control-deck__legend {
-    grid-column: 1 / -1;
+    display: none;
+  }
+
+  .mission-pause {
+    min-width: 9rem;
   }
 }
 

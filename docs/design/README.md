@@ -4,6 +4,7 @@
 
 - [Active gameplay visual-system rules](./active-gameplay-visual-system.md)
 - [Version 1 desktop reference](./v1/desktop-active-110bpm.png): active mission at a stable 110 BPM and 100% station stability
+- [Version 1 mobile reference](./v1/mobile-active-110bpm.png): the same active mission adapted for a 390px viewport
 
 Version directories contain approved review captures for the visual system. The application remains the source of truth for behavior, semantics, responsive layout, and accessibility.
 

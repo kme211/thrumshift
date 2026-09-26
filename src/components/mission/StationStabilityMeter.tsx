@@ -26,7 +26,11 @@ export function StationStabilityMeter({
   const accessibleSnapshot = accessibleStabilitySnapshot(stability)
   const trend = stabilityTrend(behavior, stability)
   return (
-    <section className="station-stability" aria-labelledby="stability-heading">
+    <section
+      className="station-stability"
+      aria-labelledby="stability-heading"
+      data-trend={trend}
+    >
       <div className="station-stability__label">
         <h2 id="stability-heading">Station stability</h2>
         <span className="station-stability__value" aria-hidden="true">

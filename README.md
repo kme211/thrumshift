@@ -72,6 +72,8 @@ npm run e2e:puzzle
 
 ## Current styling scope
 
-Tailwind is used only for safe-area-aware layout, mobile-first responsive spacing and type, and the gray-box composition. The small CSS token layer owns semantic colors and spacing. Global CSS supplies a visible keyboard-focus baseline and a reduced-motion override. No Tailwind plugins, component theme, router, or generic UI library is installed.
+Tailwind remains limited to safe-area-aware application layout and a small amount of utility styling in legacy screens and development tooling. The active gameplay screen now establishes the first production visual-system slice: reusable equipment-shell primitives, recessed CRT display surfaces, industrial labeling, persistent status indicators, physical controls, and responsive density rules. CSS tokens own both the original semantic application colors and the new equipment/display palette. Global CSS also supplies the keyboard-focus baseline, forced-color support, and reduced-motion override. No Tailwind plugins, generic component library, or router is installed.
+
+The visual rules and approved desktop reference are documented in [docs/design/active-gameplay-visual-system.md](docs/design/active-gameplay-visual-system.md). The visual language has intentionally been applied only to the representative active gameplay screen so far; the remaining lifecycle screens are later work.
 
 Run `npm run format` to apply the repository's Prettier rules. `npm run format:check` is the non-mutating quality gate.

@@ -77,12 +77,12 @@ export function ControlledCoolantPuzzle({
       className="coolant-puzzle"
       aria-labelledby="coolant-puzzle-heading"
     >
-      <h2 id="coolant-puzzle-heading" className="text-xl font-semibold">
+      <h2 id="coolant-puzzle-heading" className="coolant-puzzle__heading">
         Coolant routing
       </h2>
       <p
         id="coolant-puzzle-instructions"
-        className="mt-2 text-sm text-[var(--color-text-muted)]"
+        className="coolant-puzzle__instructions"
       >
         Rotate tiles to make one continuous route from S, the source, to R, the
         reactor.
@@ -112,7 +112,7 @@ export function ControlledCoolantPuzzle({
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>
-      <div className="mt-3 flex flex-wrap gap-3">
+      <div className="coolant-puzzle__controls">
         <button
           type="button"
           onClick={onHint}

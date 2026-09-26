@@ -105,58 +105,101 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
 
   return (
     <main className="active-mission" aria-labelledby="active-mission-heading">
-      <header className="active-mission__header">
-        <div>
-          <p className="mission-eyebrow">Active mission</p>
-          <h1 ref={headingRef} tabIndex={-1} id="active-mission-heading">
-            Reactor Cooling Failure
-          </h1>
+      <div className="equipment-shell">
+        <div className="equipment-shell__fasteners" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
         </div>
-        <BioLinkStatus
-          transport={props.telemetryStatus}
-          signalQuality={props.run.classifier.signalQuality}
-        />
-      </header>
 
-      <div className="active-mission__critical">
-        <OperationalRangeGauge
-          bpm={props.run.classifier.latestValidBpm}
-          targetRange={props.run.session.targetRange}
-          classification={props.run.classifier.stableClassification}
-        />
-        <StationStabilityMeter
-          stability={mission.stability}
-          behavior={getMissionIntervalBehavior(mission)}
-        />
+        <header className="active-mission__header">
+          <div className="active-mission__identity">
+            <p className="equipment-kicker">THRUMSHIFT / STATION 04</p>
+            <p className="mission-eyebrow">Active mission</p>
+            <h1 ref={headingRef} tabIndex={-1} id="active-mission-heading">
+              Reactor Cooling Failure
+            </h1>
+          </div>
+          <BioLinkStatus
+            transport={props.telemetryStatus}
+            signalQuality={props.run.classifier.signalQuality}
+          />
+        </header>
+
+        <div className="active-mission__console">
+          <section
+            className="equipment-module active-mission__telemetry"
+            aria-label="Mission telemetry"
+          >
+            <div className="equipment-label" aria-hidden="true">
+              <span>Biometric regulator</span>
+              <span>BR-110 / LIVE</span>
+            </div>
+            <div className="crt-display crt-display--telemetry">
+              <div className="active-mission__critical">
+                <OperationalRangeGauge
+                  bpm={props.run.classifier.latestValidBpm}
+                  targetRange={props.run.session.targetRange}
+                  classification={props.run.classifier.stableClassification}
+                />
+                <StationStabilityMeter
+                  stability={mission.stability}
+                  behavior={getMissionIntervalBehavior(mission)}
+                />
+              </div>
+            </div>
+            <p className="active-mission__instructions">
+              Stay in range while restoring coolant flow. Correct low or high
+              output, then rotate the route into place.
+            </p>
+          </section>
+
+          <section
+            className="equipment-module active-mission__routing"
+            aria-label="Coolant routing controls"
+          >
+            <div className="equipment-label" aria-hidden="true">
+              <span>Coolant route matrix</span>
+              <span>CR-03 / LOCAL</span>
+            </div>
+            <div className="crt-display crt-display--schematic">
+              <ControlledCoolantPuzzle
+                puzzle={props.run.puzzle}
+                hint={props.run.hint}
+                rotationCounts={props.run.puzzleRotationCounts}
+                disabled={props.paused || mission.status.phase === 'finalized'}
+                complete={props.run.session.statistics.puzzleCompleted}
+                hintEligible={props.hintEligible}
+                hintRemainingMs={props.hintRemainingMs}
+                onRotate={props.onRotate}
+                onHint={props.onHint}
+                onReset={props.onReset}
+              />
+            </div>
+          </section>
+        </div>
+
+        <footer className="control-deck">
+          <div className="control-deck__legend" aria-hidden="true">
+            <span>OPERATOR CONTROL BUS</span>
+            <strong>LOCAL AUTHORITY</strong>
+          </div>
+          <div className="control-deck__state" aria-hidden="true">
+            <span className="status-lamp" />
+            MISSION ACTIVE
+          </div>
+          <button
+            ref={pauseRef}
+            className="mission-pause"
+            type="button"
+            onClick={props.onPause}
+            disabled={props.paused}
+          >
+            Pause mission
+          </button>
+        </footer>
       </div>
-
-      <p className="active-mission__instructions">
-        Stay in range while restoring coolant flow. Correct low or high output,
-        then rotate the route into place.
-      </p>
-
-      <ControlledCoolantPuzzle
-        puzzle={props.run.puzzle}
-        hint={props.run.hint}
-        rotationCounts={props.run.puzzleRotationCounts}
-        disabled={props.paused || mission.status.phase === 'finalized'}
-        complete={props.run.session.statistics.puzzleCompleted}
-        hintEligible={props.hintEligible}
-        hintRemainingMs={props.hintRemainingMs}
-        onRotate={props.onRotate}
-        onHint={props.onHint}
-        onReset={props.onReset}
-      />
-
-      <button
-        ref={pauseRef}
-        className="mission-pause"
-        type="button"
-        onClick={props.onPause}
-        disabled={props.paused}
-      >
-        Pause mission
-      </button>
 
       {props.paused ? (
         <dialog

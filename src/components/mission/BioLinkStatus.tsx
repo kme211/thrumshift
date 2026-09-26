@@ -10,9 +10,17 @@ export function BioLinkStatus({
 }) {
   const connected = transport.state === 'connected'
   return (
-    <p className="bio-link-status" aria-label="Bio-link status">
-      <span aria-hidden="true">{connected ? '●' : '○'}</span> Bio-link:{' '}
-      {connected ? 'connected' : transport.state}; signal {signalQuality}
+    <p
+      className="bio-link-status"
+      aria-label="Bio-link status"
+      data-link-state={connected ? 'connected' : transport.state}
+    >
+      <span className="bio-link-status__lamp" aria-hidden="true" />
+      <span>
+        <strong>Bio-link:</strong> {connected ? 'connected' : transport.state}
+        <span className="bio-link-status__separator">; </span>
+        <small>signal {signalQuality}</small>
+      </span>
     </p>
   )
 }

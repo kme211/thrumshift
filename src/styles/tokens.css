@@ -11,4 +11,17 @@
   --color-flow: #65d5e8;
   --color-hint: #f5c451;
   --space-page: clamp(0.25rem, 4vw, 1rem);
+  --equipment-canvas: #080b0a;
+  --equipment-casing: #22231e;
+  --equipment-casing-high: #34342b;
+  --equipment-edge: #85836e;
+  --equipment-label: #c8c0a4;
+  --equipment-ink: #26251f;
+  --display-glass: #090d0c;
+  --display-glass-high: #101816;
+  --display-amber: #efb45e;
+  --display-amber-dim: #9b7440;
+  --display-green: #9fcf8d;
+  --display-cyan: #79c5bd;
+  --display-red: #d85d4a;
 }

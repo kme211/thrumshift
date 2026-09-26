@@ -31,9 +31,13 @@ Deliver one polished mission that proves the core gameplay loop is fun, accessib
 ## Visual Design
 
 - [ ] Complete visual identity
+  - [x] Approve the active desktop gameplay direction
 - [ ] Build design system
+  - [x] Establish initial equipment, display, labeling, control, and color primitives
 - [ ] Apply visual language
+  - [x] Apply it to the representative active gameplay state
 - [ ] CRT treatment
+  - [x] Establish the restrained active-display treatment
 - [ ] Sound effects
 - [ ] Music / ambience (if included)
 
@@ -41,7 +45,7 @@ Deliver one polished mission that proves the core gameplay loop is fun, accessib
 
 - [ ] Accessibility review
 - [ ] Chromium browser compatibility
-- [ ] esponsive layout validation
+- [ ] Responsive layout validation
 - [ ] Performance review
 - [ ] Error handling polish
 

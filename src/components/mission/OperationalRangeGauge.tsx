@@ -23,7 +23,11 @@ export function OperationalRangeGauge({
   readonly classification: RangeClassification | null
 }) {
   return (
-    <section className="mission-vitals" aria-labelledby="heart-rate-heading">
+    <section
+      className="mission-vitals"
+      aria-labelledby="heart-rate-heading"
+      data-classification={classification ?? 'pending'}
+    >
       <h2 id="heart-rate-heading" className="sr-only">
         Current heart rate
       </h2>

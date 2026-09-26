@@ -95,6 +95,7 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
   const visibleReasons = props.suspensionReasons.filter(
     (reason) => reason !== 'resumeRequired',
   )
+  const interruptionKind = disconnected ? 'disconnect' : 'hold'
   const reasonText: Record<SuspensionReason, string> = {
     manual: 'You paused the mission.',
     resumeRequired: 'Your confirmation is required before play continues.',
@@ -205,6 +206,7 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
         <dialog
           ref={dialogRef}
           className="pause-dialog interruption-dialog"
+          data-interruption-kind={interruptionKind}
           aria-labelledby="pause-heading"
           aria-describedby="pause-description"
           onCancel={(event) => event.preventDefault()}
@@ -234,38 +236,55 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
             }
           }}
         >
-          <p className="mission-eyebrow">Mission suspended</p>
-          <h2
-            ref={interruptionHeadingRef}
-            tabIndex={-1}
-            id="pause-heading"
-            onFocus={() => {
-              reconnectHadFocus.current = false
-            }}
-          >
-            Mission paused
-          </h2>
-          <p id="pause-description">
-            Mission time, station stability, classifications, and coolant
-            controls are frozen.
-          </p>
-          <ul className="interruption-dialog__reasons">
-            {visibleReasons.map((reason) => (
-              <li key={reason}>{reasonText[reason]}</li>
-            ))}
-          </ul>
-          {visibleReasons.length === 0 ? (
-            <p>{reasonText.resumeRequired}</p>
-          ) : null}
-          {disconnected ? (
-            <>
-              {telemetryError === null ? null : (
-                <p id="reconnect-error" className="interruption-dialog__status">
-                  {telemetryError}
-                </p>
-              )}
+          <div className="interruption-dialog__label" aria-hidden="true">
+            <span>Mission control interlock</span>
+            <span>MI-04 / {disconnected ? 'LINK OPEN' : 'OPERATOR HOLD'}</span>
+          </div>
+
+          <div className="crt-display crt-display--interruption">
+            <div className="interruption-dialog__signal" aria-hidden="true">
+              <span className="status-lamp" />
+              {disconnected ? 'BIO-LINK INTERRUPTED' : 'HOLD ENGAGED'}
+            </div>
+            <p className="mission-eyebrow">Mission suspended</p>
+            <h2
+              ref={interruptionHeadingRef}
+              tabIndex={-1}
+              id="pause-heading"
+              onFocus={() => {
+                reconnectHadFocus.current = false
+              }}
+            >
+              Mission paused
+            </h2>
+            <p id="pause-description" className="interruption-dialog__summary">
+              Mission time, station stability, classifications, and coolant
+              controls are frozen.
+            </p>
+            <ul className="interruption-dialog__reasons">
+              {visibleReasons.map((reason) => (
+                <li key={reason} data-reason={reason}>
+                  {reasonText[reason]}
+                </li>
+              ))}
+            </ul>
+            {visibleReasons.length === 0 ? (
+              <p className="interruption-dialog__reason-fallback">
+                {reasonText.resumeRequired}
+              </p>
+            ) : null}
+            {!disconnected || telemetryError === null ? null : (
+              <p id="reconnect-error" className="interruption-dialog__status">
+                {telemetryError}
+              </p>
+            )}
+          </div>
+
+          <div className="interruption-dialog__controls">
+            {disconnected ? (
               <button
                 ref={reconnectRef}
+                className="equipment-button interruption-dialog__action interruption-dialog__action--primary"
                 type="button"
                 aria-describedby={
                   telemetryError === null ? undefined : 'reconnect-error'
@@ -277,36 +296,42 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
               >
                 Reconnect monitor
               </button>
-            </>
-          ) : null}
-          <button
-            ref={resumeRef}
-            type="button"
-            aria-disabled={!props.canResume}
-            onFocus={() => {
-              reconnectHadFocus.current = false
-            }}
-            onClick={() => {
-              if (props.canResume) props.onResume()
-            }}
-          >
-            Resume mission
-          </button>
-          {!props.canResume ? (
-            <p className="interruption-dialog__status">
-              Resume becomes available when the page is visible and a fresh,
-              stable heart-rate signal is connected.
-            </p>
-          ) : null}
-          <button
-            type="button"
-            onFocus={() => {
-              reconnectHadFocus.current = false
-            }}
-            onClick={props.onEndRun}
-          >
-            End run
-          </button>
+            ) : null}
+            <button
+              ref={resumeRef}
+              className={`equipment-button interruption-dialog__action ${
+                disconnected
+                  ? 'interruption-dialog__action--resume'
+                  : 'interruption-dialog__action--primary'
+              }`}
+              type="button"
+              aria-disabled={!props.canResume}
+              onFocus={() => {
+                reconnectHadFocus.current = false
+              }}
+              onClick={() => {
+                if (props.canResume) props.onResume()
+              }}
+            >
+              Resume mission
+            </button>
+            <button
+              className="equipment-button interruption-dialog__action interruption-dialog__action--end"
+              type="button"
+              onFocus={() => {
+                reconnectHadFocus.current = false
+              }}
+              onClick={props.onEndRun}
+            >
+              End run
+            </button>
+            {!props.canResume ? (
+              <p className="interruption-dialog__status">
+                Resume becomes available when the page is visible and a fresh,
+                stable heart-rate signal is connected.
+              </p>
+            ) : null}
+          </div>
         </dialog>
       ) : null}
     </main>

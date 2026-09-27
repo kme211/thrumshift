@@ -14,6 +14,7 @@ Thrumshift is installed station equipment, not a themed web dashboard. The physi
 - `crt-display`: a recessed information surface. Curvature, edge darkening, scanlines, and glow are restricted to this layer. Scanlines must remain visible in stills but unobtrusive while reading.
 - `control-deck`: the persistent command row for current mode and high-level actions. Controls communicate ongoing state; important actions are visually separated from routine puzzle input.
 - `status-lamp`: a persistent indicator paired with text. Illumination reports equipment state and is never used as click celebration.
+- `segmented-indicator-bank`: ten persistent rectangular lamps used for quantized qualification and station reserve. It changes discrete lamp states rather than animating a fill width.
 
 ## Typography roles
 

@@ -11,7 +11,7 @@ The primary screens are separate React component trees. Briefing, commissioning,
 - Adjacent primary lifecycle changes use the browser View Transitions API when it is available: briefing → warm-up, warm-up ↔ countdown, countdown → active mission, and active mission → result.
 - The equipment shell is the single shared transition surface. Briefing, warm-up, countdown, and active mission share one desktop rail and header bay while their modules and content-driven height change naturally. The page background remains static.
 - Old and new console states use a short sequential dissolve, avoiding overlapping text, large translations, slides, wipes, or a full-page animation.
-- Warm-up procedure labels, qualification values, and countdown numerals use a 140ms readout fade. Status lamps use a 160ms color and bloom transition.
+- Warm-up procedure labels and countdown numerals use a 140ms readout fade. Status lamps use a 160ms color and bloom transition; the qualification and stability banks use a separate 120ms lamp activation/deactivation transition with no fill motion.
 - A paused mission retains its resume-status row as signal readiness changes: it reads “Waiting for a fresh, stable heart-rate signal.” until ready, then “Signal stable. Resume available.” This avoids moving the dialog controls when the status changes.
 - Unsupported browsers keep the existing immediate state update. No transition timing participates in game logic.
 - When `prefers-reduced-motion: reduce` is active, JavaScript bypasses the View Transition and CSS reduces the remaining readout and lamp effects to effectively immediate updates.

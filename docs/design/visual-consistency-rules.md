@@ -22,11 +22,13 @@ Every persistent lamp uses one semantic state: `healthy`, `warning`, `critical`,
 
 - Green: connected, ready, operational, restored, completed, or sealed.
 - Amber: live numeric telemetry, neutral prompts, advisories, or recovery in progress.
-- Red: out-of-range operation, decreasing stability, disconnected bio-link, depleted stability, or incomplete routing.
+- Red: out-of-range operation, critical or depleted stability, disconnected bio-link, or incomplete routing.
 - Cyan: live coolant flow and routing emphasis only.
 - Inactive lamps and disabled controls are neutral gray, never warning red.
 
-Degraded gameplay repeats the red classification in the stability bar and control-deck lamp, paired with `ABOVE RANGE`, `TREND: DECREASING`, and `STABILITY DEGRADING` text. The casing and page backdrop remain neutral.
+Warm-up qualification and station stability share a ten-lamp indicator-bank primitive. Lamps have persistent lit or unlit faces and only a brief activation/deactivation transition; reduced-motion mode makes the state change effectively immediate. Qualification lights one lamp for each completed whole second. Stability retains the current decile lamp until the next ten-point boundary is reached and changes the complete bank from healthy green above 75%, to degraded amber at 75–51%, to critical red at 50% and below. Exact text values remain adjacent, so the quantized bank and color never carry meaning alone.
+
+Degraded gameplay keeps its red out-of-range classification and control-deck lamp, paired with `ABOVE RANGE`, `TREND: DECREASING`, and `STABILITY DEGRADING` text. The station-stability bank independently reports its current healthy, degraded, or critical reserve band. The casing and page backdrop remain neutral.
 
 ## Control hierarchy
 

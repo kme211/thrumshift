@@ -12,7 +12,8 @@ The mission commissioning sequence bridges the approved briefing and active-game
 ## Progressive warm-up
 
 - Three persistent service stages make readiness legible: bio-link connection, usable telemetry, and operational range lock.
-- The existing qualification duration is shown as a segmented station readout with an explicit elapsed value. It is still a native progress element and does not behave like an indeterminate loader.
+- The existing qualification duration is shown as a ten-lamp station bank with an explicit elapsed value. One additional lamp illuminates only when a whole qualifying second completes; there is no interpolated fill or sweep.
+- Native progress semantics remain available to assistive technology while the visible readout uses the shared physical lit/unlit lamp construction.
 - Stage lamps use the shared `healthy`, `warning`, `critical`, and `inactive` semantics, always paired with text.
 - Live telemetry remains the visual anchor while the activation bay explains what evidence the station is accepting next.
 

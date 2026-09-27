@@ -24,6 +24,15 @@ describe('StationStabilityMeter', () => {
       'Approximately 70 percent, decreasing',
     )
     expect(meter).not.toHaveAttribute('tabindex')
+    expect(
+      view.container.querySelectorAll(
+        '.segmented-indicator-bank__lamp[data-lit="true"]',
+      ),
+    ).toHaveLength(8)
+    expect(
+      view.container.querySelector('.segmented-indicator-bank'),
+    ).toHaveAttribute('data-tone', 'degraded')
+    expect(meter.querySelector('[style]')).not.toBeInTheDocument()
 
     view.rerender(
       <StationStabilityMeter stability={71} behavior="activeAboveRange" />,
@@ -34,6 +43,11 @@ describe('StationStabilityMeter', () => {
       'aria-valuetext',
       'Approximately 70 percent, decreasing',
     )
+    expect(
+      view.container.querySelectorAll(
+        '.segmented-indicator-bank__lamp[data-lit="true"]',
+      ),
+    ).toHaveLength(8)
     expect(view.container.querySelector('[aria-live]')).not.toBeInTheDocument()
   })
 
@@ -54,6 +68,55 @@ describe('StationStabilityMeter', () => {
       'aria-valuetext',
       'Approximately 100 percent, holding',
     )
+    expect(
+      view.container.querySelectorAll(
+        '.segmented-indicator-bank__lamp[data-lit="true"]',
+      ),
+    ).toHaveLength(10)
+    expect(
+      view.container.querySelector('.segmented-indicator-bank'),
+    ).toHaveAttribute('data-tone', 'healthy')
+  })
+
+  it('uses the established warning and critical stability bands', () => {
+    const view = render(
+      <StationStabilityMeter stability={75} behavior="activeAboveRange" />,
+    )
+    expect(
+      view.container.querySelector('.segmented-indicator-bank'),
+    ).toHaveAttribute('data-tone', 'degraded')
+
+    view.rerender(
+      <StationStabilityMeter stability={50} behavior="activeAboveRange" />,
+    )
+    expect(
+      view.container.querySelector('.segmented-indicator-bank'),
+    ).toHaveAttribute('data-tone', 'critical')
+    expect(
+      view.container.querySelectorAll(
+        '.segmented-indicator-bank__lamp[data-lit="true"]',
+      ),
+    ).toHaveLength(5)
+  })
+
+  it('extinguishes a lamp only when the next ten-percent boundary is reached', () => {
+    const view = render(
+      <StationStabilityMeter stability={99} behavior="activeBelowRange" />,
+    )
+    expect(
+      view.container.querySelectorAll(
+        '.segmented-indicator-bank__lamp[data-lit="true"]',
+      ),
+    ).toHaveLength(10)
+
+    view.rerender(
+      <StationStabilityMeter stability={90} behavior="activeBelowRange" />,
+    )
+    expect(
+      view.container.querySelectorAll(
+        '.segmented-indicator-bank__lamp[data-lit="true"]',
+      ),
+    ).toHaveLength(9)
   })
 
   it('uses no timer, remounting key, or artificial text-mutation announcement trick', async () => {

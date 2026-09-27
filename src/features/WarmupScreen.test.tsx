@@ -14,7 +14,7 @@ function renderSession(
     defaultGameplayTuning,
   ),
 ) {
-  render(
+  return render(
     <WarmupScreen
       session={session}
       status={{ state: 'connected' }}
@@ -111,8 +111,22 @@ describe('WarmupScreen', () => {
       defaultGameplayTuning.countdown,
     )
     session = { ...session, warmup }
-    renderSession(session)
+    const view = renderSession(session)
     expect(screen.getByText(/5 of 10 seconds/)).toBeInTheDocument()
     expect(screen.getByRole('progressbar')).toHaveAttribute('value', '5000')
+    expect(screen.getByRole('progressbar')).toHaveAttribute(
+      'aria-valuetext',
+      '5 of 10 qualifying seconds complete',
+    )
+    expect(
+      view.container.querySelectorAll(
+        '.segmented-indicator-bank__lamp[data-lit="true"]',
+      ),
+    ).toHaveLength(5)
+    expect(
+      view.container.querySelectorAll(
+        '.segmented-indicator-bank__lamp[data-lit="false"]',
+      ),
+    ).toHaveLength(5)
   })
 })

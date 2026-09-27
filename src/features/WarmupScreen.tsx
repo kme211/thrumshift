@@ -7,6 +7,7 @@ import {
 } from '../domain/mission/warmup'
 import type { WarmupSession } from '../app/WarmupSession'
 import type { TelemetrySourceStatus } from '../telemetry/HeartRateTelemetrySource'
+import { SegmentedIndicatorBank } from '../components/mission/SegmentedIndicatorBank'
 import { TargetRangeFields } from './TargetRangeFields'
 
 interface WarmupScreenProps {
@@ -231,23 +232,23 @@ export function WarmupScreen(props: WarmupScreenProps) {
                 <div className="warmup-sequence__qualification">
                   <p>
                     Consecutive operational progress:{' '}
-                    <strong>
-                      <span
-                        key={progressSeconds}
-                        className="instrument-readout-transition"
-                      >
-                        {progressSeconds} of 10 seconds
-                      </span>
-                    </strong>
+                    <strong>{progressSeconds} of 10 seconds</strong>
                   </p>
                   <progress
+                    className="sr-only"
                     id="warmup-progress"
                     aria-label="Consecutive operational progress"
+                    aria-valuetext={`${progressSeconds} of 10 qualifying seconds complete`}
                     max={defaultGameplayTuning.warmup.qualificationMs}
                     value={progress}
                   >
                     {progressSeconds} seconds
                   </progress>
+                  <SegmentedIndicatorBank
+                    className="warmup-sequence__qualification-bank"
+                    litSegments={progressSeconds}
+                    tone="healthy"
+                  />
                   <p>
                     Hold a steady signal in the gameplay range to authorize
                     mission transfer.

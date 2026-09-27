@@ -104,6 +104,9 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
       : missionBehavior === 'activeOperational' && mission.stability < 100
         ? 'recovering'
         : 'stable'
+  const resumeStatus = props.canResume
+    ? 'Signal stable. Resume available.'
+    : 'Waiting for a fresh, stable heart-rate signal.'
   const reasonText: Record<SuspensionReason, string> = {
     manual: 'You paused the mission.',
     resumeRequired: 'Your confirmation is required before play continues.',
@@ -114,7 +117,7 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
 
   return (
     <main className="active-mission" aria-labelledby="active-mission-heading">
-      <div className="equipment-shell">
+      <div className="equipment-shell active-mission__shell">
         <div className="equipment-shell__fasteners" aria-hidden="true">
           <span />
           <span />
@@ -352,12 +355,7 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
             >
               End run
             </button>
-            {!props.canResume ? (
-              <p className="interruption-dialog__status">
-                Resume becomes available when the page is visible and a fresh,
-                stable heart-rate signal is connected.
-              </p>
-            ) : null}
+            <p className="interruption-dialog__status">{resumeStatus}</p>
           </div>
         </dialog>
       ) : null}

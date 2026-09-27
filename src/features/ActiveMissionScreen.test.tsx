@@ -172,10 +172,29 @@ describe('ActiveMissionScreen', () => {
     expect(onReconnect).toHaveBeenCalledOnce()
     const resume = screen.getByRole('button', { name: 'Resume mission' })
     expect(resume).toHaveAttribute('aria-disabled', 'true')
+    expect(
+      screen.getByText('Waiting for a fresh, stable heart-rate signal.'),
+    ).toBeInTheDocument()
     await user.click(resume)
     expect(onResume).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'End run' }))
     expect(onEndRun).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the resume-status slot populated when the signal becomes stable', () => {
+    const { rerenderMission } = renderMission(true, ['manual'], false)
+    expect(
+      screen.getByText('Waiting for a fresh, stable heart-rate signal.'),
+    ).toBeInTheDocument()
+
+    rerenderMission(['manual'], true)
+
+    expect(
+      screen.getByText('Signal stable. Resume available.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText('Waiting for a fresh, stable heart-rate signal.'),
+    ).not.toBeInTheDocument()
   })
 
   it('visibly associates a canonical telemetry error with the focused retry control', async () => {

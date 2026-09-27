@@ -24,6 +24,63 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+.mission-flow-stage {
+  min-width: 0;
+}
+
+::view-transition-old(root) {
+  animation: none;
+  opacity: 0;
+}
+
+::view-transition-new(root) {
+  animation: none;
+  opacity: 1;
+}
+
+::view-transition-group(station-console) {
+  animation-duration: 200ms;
+  animation-timing-function: cubic-bezier(0.2, 0.65, 0.3, 1);
+}
+
+::view-transition-old(station-console) {
+  animation: console-state-out 90ms ease-in both;
+  mix-blend-mode: normal;
+}
+
+::view-transition-new(station-console) {
+  animation: console-state-in 110ms 70ms ease-out both;
+  mix-blend-mode: normal;
+}
+
+@keyframes console-state-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes console-state-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes instrument-readout-settle {
+  from {
+    opacity: 0.48;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.instrument-readout-transition {
+  animation: instrument-readout-settle 140ms ease-out both;
+}
+
 :focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 3px;
@@ -65,6 +122,17 @@ button:disabled {
   padding-bottom: 1rem;
 }
 
+/*
+ * Briefing through active play are different operating modes of the same
+ * installed console. Keep their outer rail and header bay in place while the
+ * individual modules and the content-driven chassis height change naturally.
+ */
+.pre-mission,
+.warmup-sequence,
+.active-mission {
+  width: min(100%, 80rem);
+}
+
 .equipment-shell {
   position: relative;
   isolation: isolate;
@@ -85,6 +153,7 @@ button:disabled {
     inset 0 1px rgb(255 255 255 / 0.08),
     inset 0 -2px rgb(0 0 0 / 0.55),
     0 0 0 0.35rem #121411;
+  view-transition-name: station-console;
 }
 
 .equipment-shell__fasteners {
@@ -253,6 +322,10 @@ button:disabled {
   border-radius: 50%;
   background: #55564b;
   box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.35);
+  transition:
+    background-color 160ms ease-out,
+    box-shadow 160ms ease-out,
+    opacity 160ms ease-out;
 }
 
 .status-lamp[data-status='healthy'] {
@@ -1708,6 +1781,12 @@ button:disabled {
 }
 
 @media (min-width: 52rem) {
+  .active-mission__header,
+  .pre-mission__header,
+  .warmup-sequence__header {
+    min-height: 8.75rem;
+  }
+
   .pre-mission__console {
     grid-template-columns: minmax(16rem, 0.76fr) minmax(25rem, 1.24fr);
     align-items: stretch;
@@ -2410,5 +2489,11 @@ button:disabled {
 
   .coolant-tile__graphic {
     animation: none;
+  }
+
+  ::view-transition-group(station-console),
+  ::view-transition-old(station-console),
+  ::view-transition-new(station-console) {
+    animation: none !important;
   }
 }

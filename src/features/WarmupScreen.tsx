@@ -160,7 +160,12 @@ export function WarmupScreen(props: WarmupScreenProps) {
                       ? '▲'
                       : '◇'}
                 </span>{' '}
-                {classificationHeadline(props.session)}
+                <span
+                  key={classificationHeadline(props.session)}
+                  className="instrument-readout-transition"
+                >
+                  {classificationHeadline(props.session)}
+                </span>
               </p>
               <p className="warmup-sequence__target">
                 Target range: {targetRange.lowerBpm}–{targetRange.upperBpm} BPM
@@ -215,13 +220,25 @@ export function WarmupScreen(props: WarmupScreenProps) {
                   : 'Station commissioning'}
               </p>
               <p className="warmup-sequence__procedure-state">
-                {procedureState}
+                <span
+                  key={procedureState}
+                  className="instrument-readout-transition"
+                >
+                  {procedureState}
+                </span>
               </p>
               {countdownSeconds === null ? (
                 <div className="warmup-sequence__qualification">
                   <p>
                     Consecutive operational progress:{' '}
-                    <strong>{progressSeconds} of 10 seconds</strong>
+                    <strong>
+                      <span
+                        key={progressSeconds}
+                        className="instrument-readout-transition"
+                      >
+                        {progressSeconds} of 10 seconds
+                      </span>
+                    </strong>
                   </p>
                   <progress
                     id="warmup-progress"
@@ -238,7 +255,11 @@ export function WarmupScreen(props: WarmupScreenProps) {
                 </div>
               ) : (
                 <div className="warmup-sequence__countdown">
-                  <output aria-label="Seconds until mission activation">
+                  <output
+                    key={countdownSeconds}
+                    className="instrument-readout-transition"
+                    aria-label="Seconds until mission activation"
+                  >
                     {countdownSeconds}
                   </output>
                   <p>Seconds to mission transfer</p>

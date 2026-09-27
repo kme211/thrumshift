@@ -26,8 +26,13 @@ import {
   createMissionFlowState,
   missionFlowReducer,
 } from './MissionFlowController'
-import type { MissionFlowFactPayload } from './MissionFlowController'
+import type {
+  MissionFlowFact,
+  MissionFlowFactPayload,
+  MissionFlowState,
+} from './MissionFlowController'
 import { getMissionHintEligibility } from './MissionRun'
+import { commitMissionFlowUpdate } from './missionFlowTransition'
 
 const DevelopmentDiagnostics = import.meta.env.DEV
   ? lazy(() =>
@@ -44,6 +49,12 @@ interface AppFlowProps {
   readonly wakeLock: ScreenWakeLock
   readonly bluetoothSource: WebBluetoothHeartRateSource
   readonly simulatedSource: SimulatedHeartRateSource | null
+}
+
+interface QueuedMissionFlowUpdate {
+  readonly event: MissionFlowFact
+  readonly from: MissionFlowState['lifecycle']['phase']
+  readonly to: MissionFlowState['lifecycle']['phase']
 }
 
 function wantsWakeLock(state: {
@@ -71,13 +82,48 @@ export function AppFlow({
     import.meta.env.DEV,
     createMissionFlowState,
   )
+  const predictedStateRef = useRef(state)
+  const queuedUpdatesRef = useRef<QueuedMissionFlowUpdate[]>([])
+  const transitionUpdatePendingRef = useRef(false)
+  const processQueuedUpdatesRef = useRef<() => void>(() => undefined)
   const nextFactSequence = useRef(0)
   const nextSourceGeneration = useRef(0)
-  const dispatchFact = useCallback(
-    (fact: MissionFlowFactPayload) =>
-      dispatch({ ...fact, sequence: ++nextFactSequence.current }),
-    [],
-  )
+
+  processQueuedUpdatesRef.current = () => {
+    if (transitionUpdatePendingRef.current) return
+    const queued = queuedUpdatesRef.current.shift()
+    if (queued === undefined) return
+
+    const updateCallbackDone = commitMissionFlowUpdate(
+      queued.from,
+      queued.to,
+      () => dispatch(queued.event),
+    )
+    if (updateCallbackDone === null) {
+      processQueuedUpdatesRef.current()
+      return
+    }
+
+    transitionUpdatePendingRef.current = true
+    const releaseTransitionQueue = () => {
+      transitionUpdatePendingRef.current = false
+      processQueuedUpdatesRef.current()
+    }
+    void updateCallbackDone.then(releaseTransitionQueue, releaseTransitionQueue)
+  }
+
+  const dispatchFact = useCallback((fact: MissionFlowFactPayload) => {
+    const event = { ...fact, sequence: ++nextFactSequence.current }
+    const current = predictedStateRef.current
+    const next = missionFlowReducer(current, event)
+    predictedStateRef.current = next
+    queuedUpdatesRef.current.push({
+      event,
+      from: current.lifecycle.phase,
+      to: next.lifecycle.phase,
+    })
+    processQueuedUpdatesRef.current()
+  }, [])
   const [selectedSource, setSelectedSource] = useState<
     'simulated' | 'bluetooth'
   >(simulatedSource === null ? 'bluetooth' : 'simulated')
@@ -324,7 +370,12 @@ export function AppFlow({
       <div aria-live="polite" className="sr-only">
         {state.announcement}
       </div>
-      {screen}
+      <div
+        className="mission-flow-stage"
+        data-mission-phase={state.lifecycle.phase}
+      >
+        {screen}
+      </div>
       {simulatedSource === null || DevelopmentDiagnostics === null ? null : (
         <Suspense fallback={null}>
           <DevelopmentDiagnostics

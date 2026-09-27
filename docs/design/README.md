@@ -8,6 +8,8 @@
 - [Mission suspension visual-system rules](./mission-suspension-visual-system.md)
 - [Mission result visual-system rules](./mission-result-visual-system.md)
 - [Cross-state consistency rules](./visual-consistency-rules.md)
+- [Mission-flow transition continuity](./transition-continuity.md)
+- [Desktop briefing-to-result transition recording](./mission-flow-continuity.webm)
 - [Version 1 desktop reference](./v1/desktop-active-110bpm.png): active mission at a stable 110 BPM and 100% station stability
 - [Version 1 mobile reference](./v1/mobile-active-110bpm.png): the same active mission adapted for a 390px viewport
 - [Version 1 desktop degraded reference](./v1/desktop-active-degraded.png): active mission at 170 BPM with station stability decreasing

@@ -19,10 +19,12 @@ async function enterActiveMission(page: import('@playwright/test').Page) {
   await cadence.fill('250')
   await page.getByRole('button', { name: 'Start Samples' }).click()
   await page.getByRole('button', { name: 'Begin Warm-Up' }).click()
+  await expect(page.getByText('Active mission')).toBeVisible({
+    timeout: 20_000,
+  })
   await expect(
     page.getByRole('heading', { level: 1, name: 'Reactor Cooling Failure' }),
-  ).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByText('Active mission')).toBeVisible()
+  ).toBeVisible()
 }
 
 async function assertTilesInsideViewport(
@@ -332,7 +334,7 @@ test('hidden and disconnected blockers clear independently', async ({
   })
   await page
     .getByRole('button', { name: 'Disconnect simulator' })
-    .click({ force: true })
+    .evaluate((button: HTMLButtonElement) => button.click())
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,

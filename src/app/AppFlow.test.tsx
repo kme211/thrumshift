@@ -162,6 +162,59 @@ async function finishFailedFlow(
 }
 
 describe('AppFlow pre-mission and warm-up integration', () => {
+  it('preserves fact order while a browser transition callback is pending', async () => {
+    const originalStartViewTransition = Object.getOwnPropertyDescriptor(
+      document,
+      'startViewTransition',
+    )
+    let commitTransition: (() => void) | null = null
+    let resolveUpdate: () => void = () => undefined
+    const updateCallbackDone = new Promise<void>((resolve) => {
+      resolveUpdate = resolve
+    })
+    Object.defineProperty(document, 'startViewTransition', {
+      configurable: true,
+      value: vi.fn((update: () => void) => {
+        commitTransition = () => {
+          update()
+          resolveUpdate()
+        }
+        return { updateCallbackDone }
+      }),
+    })
+
+    try {
+      const { simulatedSource, setTime } = renderFlow()
+      await act(() => simulatedSource.connect())
+      fireEvent.click(screen.getByRole('button', { name: 'Begin Warm-Up' }))
+
+      setTime(100)
+      act(() => simulatedSource.emitSample(110))
+      await act(async () => {
+        commitTransition?.()
+        await updateCallbackDone
+        await Promise.resolve()
+      })
+
+      expect(
+        await screen.findByRole('heading', { name: 'Warm-up' }),
+      ).toBeInTheDocument()
+      expect(screen.getByLabelText('Latest heart rate')).toHaveTextContent(
+        '110',
+      )
+    } finally {
+      if (originalStartViewTransition === undefined) {
+        Reflect.deleteProperty(document, 'startViewTransition')
+      } else {
+        Object.defineProperty(
+          document,
+          'startViewTransition',
+          originalStartViewTransition,
+        )
+      }
+    }
+  })
+
   it('keeps source-owned continuous samples running across screen transitions', async () => {
     const { simulatedSource, simulatedTimers, setTime } = renderFlow()
     await act(() => simulatedSource.connect())

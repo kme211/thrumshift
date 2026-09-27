@@ -28,6 +28,9 @@ describe('LaunchScreen', () => {
       screen.getByText('Compatible Bluetooth heart-rate monitor required.'),
     ).toBeVisible()
     expect(screen.queryByText(/HTTPS or localhost/i)).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Built by Keari Eggers' }),
+    ).toHaveAttribute('href', 'https://kearieggers.com')
 
     await user.click(screen.getByRole('button', { name: 'Run Simulation' }))
     await user.click(screen.getByRole('button', { name: 'Connect Bio-Link' }))

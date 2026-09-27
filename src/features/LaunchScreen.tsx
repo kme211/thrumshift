@@ -156,6 +156,14 @@ export function LaunchScreen({
             <span className="status-lamp" data-status="inactive" />
             SELECT INPUT SOURCE
           </div>
+          <a
+            className="launch-screen__attribution"
+            href="https://kearieggers.com"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Built by Keari Eggers
+          </a>
         </footer>
       </div>
     </section>

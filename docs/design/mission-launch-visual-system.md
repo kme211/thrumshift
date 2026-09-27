@@ -7,6 +7,7 @@ The production launch console is a lightweight station-access state before the e
 - The launch state uses the established `equipment-shell`, fasteners, printed subsystem strips, restrained status lamps, recessed CRT treatment, and physical control deck.
 - The mission-directive CRT carries the station identity, tagline, single-sentence premise, and a compact `HEART RATE › STABILITY › COOLANT ROUTE` relationship. It is the only large display surface.
 - The telemetry-access bay contains two functional service channels rather than feature cards. Each channel pairs a persistent state lamp, concise requirement text, and one full-width physical control.
+- A muted `Built by Keari Eggers` maker's link sits in the bottom control deck. It provides provenance without competing with either launch action.
 - The page uses no screenshots, feature grids, decorative instruments, pricing, or marketing sections.
 
 ## Approved copy

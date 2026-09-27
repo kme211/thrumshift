@@ -524,7 +524,22 @@ button:disabled {
 }
 
 .launch-screen__control-deck {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.launch-screen__attribution {
+  color: #77796a;
+  font-size: 0.57rem;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-decoration-color: #56584d;
+  text-underline-offset: 0.18rem;
+  text-transform: uppercase;
+}
+
+.launch-screen__attribution:hover,
+.launch-screen__attribution:focus-visible {
+  color: #b7b39f;
 }
 
 .active-mission__console {

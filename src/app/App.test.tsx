@@ -1,21 +1,29 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
 import { App } from './App'
 
 describe('App', () => {
-  it('renders the branded pre-mission gray box with a semantic screen heading', () => {
-    render(<App />)
+  it('opens with the launch console and enters briefing through simulation', async () => {
+    const user = userEvent.setup()
+    const view = render(<App />)
 
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Reactor Cooling Failure',
+        name: 'Stay in range. Keep the station alive.',
       }),
     ).toBeInTheDocument()
-    expect(screen.getByText('Thrumshift')).toBeInTheDocument()
+    expect(screen.getByText(/Thrumshift \/ Station 04/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Run Simulation' }))
     expect(
-      screen.getByText('Stay in range. Keep the station alive.'),
-    ).toBeInTheDocument()
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Reactor Cooling Failure',
+      }),
+    ).toHaveFocus()
+    view.unmount()
   })
 })

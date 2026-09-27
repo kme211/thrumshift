@@ -19,7 +19,10 @@ import type { Scheduler } from '../platform/Scheduler'
 import type { ScreenWakeLock } from '../platform/ScreenWakeLock'
 import type { HeartRateTelemetrySource } from '../telemetry/HeartRateTelemetrySource'
 import type { WebBluetoothHeartRateSource } from '../telemetry/bluetooth/WebBluetoothHeartRateSource'
-import type { SimulatedHeartRateSource } from '../telemetry/simulated/SimulatedHeartRateSource'
+import {
+  SIMULATED_HR6_CADENCE_MS,
+  type SimulatedHeartRateSource,
+} from '../telemetry/simulated/SimulatedHeartRateSource'
 import {
   canBeginWarmup,
   canResumeMission,
@@ -49,6 +52,8 @@ interface AppFlowProps {
   readonly wakeLock: ScreenWakeLock
   readonly bluetoothSource: WebBluetoothHeartRateSource
   readonly simulatedSource: SimulatedHeartRateSource | null
+  readonly initialSource?: 'simulated' | 'bluetooth'
+  readonly startSimulationOnMount?: boolean
 }
 
 interface QueuedMissionFlowUpdate {
@@ -76,6 +81,8 @@ export function AppFlow({
   wakeLock,
   bluetoothSource,
   simulatedSource,
+  initialSource = simulatedSource === null ? 'bluetooth' : 'simulated',
+  startSimulationOnMount = false,
 }: AppFlowProps) {
   const [state, dispatch] = useReducer(
     missionFlowReducer,
@@ -126,7 +133,7 @@ export function AppFlow({
   }, [])
   const [selectedSource, setSelectedSource] = useState<
     'simulated' | 'bluetooth'
-  >(simulatedSource === null ? 'bluetooth' : 'simulated')
+  >(initialSource)
   const source: HeartRateTelemetrySource =
     selectedSource === 'simulated' && simulatedSource !== null
       ? simulatedSource
@@ -203,10 +210,11 @@ export function AppFlow({
     [scheduler, wakeLock],
   )
 
-  useEffect(
-    () => () => simulatedSource?.stopContinuousSamples(),
-    [simulatedSource],
-  )
+  useEffect(() => {
+    if (startSimulationOnMount)
+      simulatedSource?.startContinuousSamples(110, SIMULATED_HR6_CADENCE_MS)
+    return () => simulatedSource?.stopContinuousSamples()
+  }, [simulatedSource, startSimulationOnMount])
 
   function selectSource(next: 'simulated' | 'bluetooth'): void {
     if (next === selectedSource) return
@@ -237,7 +245,7 @@ export function AppFlow({
         latestBpm={state.latestPreMissionBpm}
         {...targetProps}
         canBegin={canBeginWarmup(state)}
-        showSourceSelector={simulatedSource !== null}
+        showSourceSelector={import.meta.env.DEV && simulatedSource !== null}
         selectedSource={selectedSource}
         onSelectSource={selectSource}
         onConnect={() => void source.connect()}

@@ -1,3 +1,6 @@
+import { useState } from 'react'
+
+import { LaunchScreen } from '../features/LaunchScreen'
 import { WebBluetoothHeartRateSource } from '../telemetry/bluetooth/WebBluetoothHeartRateSource'
 import { getBrowserBluetoothEnvironment } from '../telemetry/bluetooth/bluetoothPorts'
 import { SimulatedHeartRateSource } from '../telemetry/simulated/SimulatedHeartRateSource'
@@ -16,21 +19,43 @@ const bluetoothSource = new WebBluetoothHeartRateSource(
   clock,
 )
 
-const simulatedSource = import.meta.env.DEV
-  ? new SimulatedHeartRateSource(clock)
-  : null
+const simulatedSource = new SimulatedHeartRateSource(clock)
+
+type LaunchMode = 'simulated' | 'bluetooth'
 
 export function App() {
+  const [launchMode, setLaunchMode] = useState<LaunchMode | null>(null)
+
+  function runSimulation(): void {
+    void simulatedSource.connect()
+    setLaunchMode('simulated')
+  }
+
+  function connectBioLink(): void {
+    void bluetoothSource.connect()
+    setLaunchMode('bluetooth')
+  }
+
   return (
     <main className="min-h-dvh pt-[max(var(--space-page),env(safe-area-inset-top))] pr-[max(var(--space-page),env(safe-area-inset-right))] pb-[max(var(--space-page),env(safe-area-inset-bottom))] pl-[max(var(--space-page),env(safe-area-inset-left))] sm:pt-[max(3rem,env(safe-area-inset-top))] sm:pr-[max(2.5rem,env(safe-area-inset-right))] sm:pb-[max(3rem,env(safe-area-inset-bottom))] sm:pl-[max(2.5rem,env(safe-area-inset-left))]">
-      <AppFlow
-        clock={clock}
-        scheduler={scheduler}
-        visibility={visibility}
-        wakeLock={wakeLock}
-        bluetoothSource={bluetoothSource}
-        simulatedSource={simulatedSource}
-      />
+      {launchMode === null ? (
+        <LaunchScreen
+          bluetoothCapability={bluetoothSource.capability}
+          onRunSimulation={runSimulation}
+          onConnectBioLink={connectBioLink}
+        />
+      ) : (
+        <AppFlow
+          clock={clock}
+          scheduler={scheduler}
+          visibility={visibility}
+          wakeLock={wakeLock}
+          bluetoothSource={bluetoothSource}
+          simulatedSource={simulatedSource}
+          initialSource={launchMode}
+          startSimulationOnMount={launchMode === 'simulated'}
+        />
+      )}
     </main>
   )
 }

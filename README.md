@@ -20,7 +20,9 @@ npx playwright install chromium
 
 Start the development server with `npm run dev`, then open the local URL Vite prints.
 
-Development builds show one diagnostics panel beneath the product flow. Its coolant workbench exposes the 3×3 authored puzzle, deterministic hint, and reset without connecting it to mission or telemetry rules. Select Simulator in the mission briefing and connect it, then start continuous samples from diagnostics to emit the selected BPM at the configurable cadence while moving through the flow. The 1,095 ms default approximates the observed HR6 cadence. BPM changes apply to subsequent samples; Stop Samples deliberately allows normal staleness testing, and one-shot emission remains available. Select Web Bluetooth in the mission briefing and use “Choose heart-rate monitor” to open the browser chooser from that explicit button gesture.
+The app opens on a production station-access console. `Run Simulation` enters the existing briefing with a connected 110 BPM training signal, so no heart-rate monitor or query string is required. `Connect Bio-Link` opens the Web Bluetooth chooser directly from the explicit button gesture and enters the same briefing with the hardware source selected.
+
+Development builds additionally show one diagnostics panel beneath the product flow after a launch path is selected. Its coolant workbench exposes the 3×3 authored puzzle, deterministic hint, and reset without connecting it to mission or telemetry rules. The simulator controls can change BPM and cadence, stop the production simulation stream for staleness testing, or emit one-shot samples. The 1,095 ms default approximates the observed HR6 cadence. The development briefing also retains its telemetry-source selector; neither the selector nor diagnostics are included in production.
 
 The pre-mission and warm-up components render canonical heart-rate and warm-up domain values; they do not calculate signal quality, classification, qualification, or countdown validity. Backgrounding warm-up/countdown invalidates progress and returns through a fresh warm-up on recovery. Disconnect, stale signal, and target-range changes also revoke qualification. Disconnect and stale signal suspend the lifecycle and release Wake Lock; suspended warm-up offers a direct reconnect gesture when needed and a safe return to the briefing. Stale recovery requires fresh usable, stable classification. Wake Lock is requested only for unsuspended warm-up, countdown, and active-mission shells, and unsupported or rejected requests never block navigation.
 
@@ -42,7 +44,7 @@ Automated component tests inject telemetry sources at the application boundary r
 
 1. Serve the development app from localhost or an HTTPS origin and open it in Android Chrome.
 2. Turn on and wear the heart-rate monitor according to its manufacturer instructions.
-3. Select Web Bluetooth, choose “Choose heart-rate monitor,” and select the monitor in Chrome’s chooser.
+3. Choose `Connect Bio-Link` on the launch console and select the monitor in Chrome’s chooser.
 4. Confirm connecting becomes connected and live BPM values appear.
 5. Intentionally disconnect or power off the monitor; confirm the run suspends, Wake Lock releases, and reconnect and return-to-briefing actions appear.
 6. Use the reconnect action, choose the monitor again, and verify warm-up restarts from zero without duplicate notifications.
@@ -74,6 +76,6 @@ npm run e2e:puzzle
 
 Tailwind remains limited to safe-area-aware application layout and a small amount of utility styling in legacy screens and development tooling. The active gameplay screen now establishes the first production visual-system slice: reusable equipment-shell primitives, recessed CRT display surfaces, industrial labeling, persistent status indicators, physical controls, and responsive density rules. CSS tokens own both the original semantic application colors and the new equipment/display palette. Global CSS also supplies the keyboard-focus baseline, forced-color support, and reduced-motion override. No Tailwind plugins, generic component library, or router is installed.
 
-The visual rules and approved desktop reference are documented in [docs/design/active-gameplay-visual-system.md](docs/design/active-gameplay-visual-system.md). The visual language has intentionally been applied only to the representative active gameplay screen so far; the remaining lifecycle screens are later work.
+The approved visual rules and captures are indexed under [docs/design](docs/design/README.md). The industrial equipment language now covers the production launch console and the complete mission lifecycle without changing their underlying information architecture.
 
 Run `npm run format` to apply the repository's Prettier rules. `npm run format:check` is the non-mutating quality gate.

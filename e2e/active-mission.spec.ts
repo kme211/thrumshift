@@ -14,10 +14,11 @@ async function assertNoHorizontalOverflow(
 
 async function enterActiveMission(page: import('@playwright/test').Page) {
   await page.goto('/')
+  await page.getByRole('button', { name: 'Run Simulation' }).click()
   await page.getByRole('button', { name: 'Connect simulator' }).click()
   const cadence = page.getByLabel('Sample cadence (ms)')
   await cadence.fill('250')
-  await page.getByRole('button', { name: 'Start Samples' }).click()
+  await page.getByRole('button', { name: /^(Start|Restart) Samples$/ }).click()
   await page.getByRole('button', { name: 'Begin Warm-Up' }).click()
   await expect(page.getByText('Active mission')).toBeVisible({
     timeout: 20_000,

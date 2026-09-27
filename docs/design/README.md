@@ -9,7 +9,10 @@
 - [Mission result visual-system rules](./mission-result-visual-system.md)
 - [Cross-state consistency rules](./visual-consistency-rules.md)
 - [Mission-flow transition continuity](./transition-continuity.md)
+- [Production launch-console visual-system rules](./mission-launch-visual-system.md)
 - [Desktop briefing-to-result transition recording](./mission-flow-continuity.webm)
+- [Version 1 desktop launch reference](./v1/desktop-launch.png): production station-access console with simulator and bio-link paths
+- [Version 1 mobile launch reference](./v1/mobile-launch-390px.png): the same launch console adapted for a 390px viewport
 - [Version 1 desktop reference](./v1/desktop-active-110bpm.png): active mission at a stable 110 BPM and 100% station stability
 - [Version 1 mobile reference](./v1/mobile-active-110bpm.png): the same active mission adapted for a 390px viewport
 - [Version 1 desktop degraded reference](./v1/desktop-active-degraded.png): active mission at 170 BPM with station stability decreasing

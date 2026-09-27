@@ -33,7 +33,8 @@ async function emitSample(page: Page, time: number, bpm?: number) {
 async function enterMission(page: Page, origin = 0) {
   if (origin === 0) {
     await openWithDeterministicClock(page)
-    await page.getByRole('button', { name: 'Connect simulator' }).click()
+    await page.getByRole('button', { name: 'Run Simulation' }).click()
+    await page.getByRole('button', { name: 'Stop Samples' }).click()
   }
   await setTestTime(page, origin)
   await page.getByRole('button', { name: 'Begin Warm-Up' }).click()

@@ -28,6 +28,13 @@ body {
   min-width: 0;
 }
 
+.launch-screen {
+  width: min(100%, 76rem);
+  min-width: 0;
+  margin-inline: auto;
+  padding-bottom: 1rem;
+}
+
 ::view-transition-old(root) {
   animation: none;
   opacity: 0;
@@ -185,6 +192,7 @@ button:disabled {
 .active-mission__header,
 .pre-mission__header,
 .warmup-sequence__header,
+.launch-screen__header,
 .mission-result__header {
   min-width: 0;
   margin: 0 0 1.25rem;
@@ -194,6 +202,7 @@ button:disabled {
 
 .active-mission__header,
 .warmup-sequence__header,
+.launch-screen__header,
 .mission-result__header {
   display: flex;
   flex-wrap: wrap;
@@ -206,6 +215,10 @@ button:disabled {
 }
 
 .warmup-sequence__header {
+  align-items: center;
+}
+
+.launch-screen__header {
   align-items: center;
 }
 
@@ -225,7 +238,8 @@ button:disabled {
 }
 
 .active-mission__identity,
-.warmup-sequence__identity {
+.warmup-sequence__identity,
+.launch-screen__identity {
   min-width: 0;
 }
 
@@ -234,6 +248,7 @@ button:disabled {
 .control-deck,
 .bio-link-status,
 .warmup-sequence__status,
+.launch-screen__status,
 .mission-result__seal {
   font-family: var(--font-equipment);
   letter-spacing: 0.12em;
@@ -299,6 +314,7 @@ button:disabled {
 
 .bio-link-status,
 .warmup-sequence__status,
+.launch-screen__status,
 .mission-result__seal {
   display: flex;
   align-items: center;
@@ -369,8 +385,146 @@ button:disabled {
   font-weight: 750;
 }
 
+.launch-screen__status small {
+  display: block;
+  margin-top: 0.22rem;
+  color: #aaa995;
+  font-size: 0.62rem;
+  font-weight: 750;
+}
+
 .bio-link-status__separator {
   font-size: 0;
+}
+
+.launch-screen__console {
+  display: grid;
+  gap: clamp(0.8rem, 1.8vw, 1.4rem);
+  min-width: 0;
+}
+
+.crt-display--launch {
+  --crt-phosphor-rgb: 239 180 94;
+  display: flex;
+  min-height: clamp(22rem, 48vw, 30rem);
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(1.4rem, 4vw, 3rem);
+  font-family: var(--font-instrument);
+}
+
+.launch-screen__display-kicker {
+  margin: 0;
+  color: var(--display-amber-dim);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.launch-screen h1 {
+  max-width: 14ch;
+  margin: 0.55rem 0 0;
+  color: #eee8d7;
+  font-family: var(--font-equipment);
+  font-size: clamp(2.7rem, 6.5vw, 5.4rem);
+  font-weight: 720;
+  letter-spacing: -0.045em;
+  line-height: 0.94;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 1px rgb(255 245 218 / 0.5),
+    0 0 0.45rem rgb(239 180 94 / 0.09);
+}
+
+.launch-screen__summary {
+  max-width: 52ch;
+  margin: 1.25rem 0 0;
+  color: #a9b5ad;
+  font-family: var(--font-instrument);
+  font-size: clamp(0.78rem, 1.4vw, 0.92rem);
+  line-height: 1.55;
+}
+
+.launch-screen__signal-line {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, auto));
+  justify-content: start;
+  gap: 0.55rem;
+  margin-top: 1.45rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid #3f493e;
+  color: #73877d;
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+
+.launch-screen__signal-line span:not(:last-child)::after {
+  margin-left: 0.55rem;
+  color: var(--display-amber-dim);
+  content: '›';
+}
+
+.launch-screen__access {
+  display: flex;
+  flex-direction: column;
+}
+
+.launch-screen__access-panel {
+  display: grid;
+  flex: 1;
+  border: 1px solid #595a4c;
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 0.02), transparent 45%), #22241e;
+  box-shadow: inset 0 1px rgb(255 255 255 / 0.045);
+}
+
+.launch-screen__channel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: clamp(1rem, 2.4vw, 1.5rem);
+}
+
+.launch-screen__channel + .launch-screen__channel {
+  border-top: 1px solid #5b5b4e;
+}
+
+.launch-screen__channel-state {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--equipment-label);
+  font-family: var(--font-equipment);
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+}
+
+.launch-screen__channel-state small {
+  display: block;
+  margin-top: 0.2rem;
+  color: #888978;
+  font-size: 0.61rem;
+  letter-spacing: 0.07em;
+}
+
+.launch-screen__channel p {
+  flex: 1;
+  margin: 0.8rem 0 1rem;
+  color: #bdb9aa;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.launch-screen__action {
+  width: 100%;
+  min-width: 0;
+}
+
+.launch-screen__control-deck {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .active-mission__console {
@@ -1781,8 +1935,24 @@ button:disabled {
 @media (min-width: 52rem) {
   .active-mission__header,
   .pre-mission__header,
-  .warmup-sequence__header {
+  .warmup-sequence__header,
+  .launch-screen__header {
     min-height: 8.75rem;
+  }
+
+  .launch-screen__console {
+    grid-template-columns: minmax(25rem, 1.18fr) minmax(20rem, 0.82fr);
+    align-items: stretch;
+  }
+
+  .launch-screen__briefing,
+  .launch-screen__access {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .launch-screen__briefing .crt-display {
+    flex: 1;
   }
 
   .pre-mission__console {
@@ -2103,6 +2273,7 @@ button:disabled {
   .active-mission__header,
   .pre-mission__header,
   .warmup-sequence__header,
+  .launch-screen__header,
   .mission-result__header {
     align-items: stretch;
     gap: 0.65rem;
@@ -2119,6 +2290,7 @@ button:disabled {
 
   .bio-link-status,
   .warmup-sequence__status,
+  .launch-screen__status,
   .mission-result__seal {
     width: 100%;
     min-height: 2.7rem;
@@ -2128,18 +2300,21 @@ button:disabled {
   .bio-link-status strong,
   .bio-link-status small,
   .warmup-sequence__status small,
+  .launch-screen__status small,
   .mission-result__seal small {
     display: inline;
   }
 
   .bio-link-status small,
   .warmup-sequence__status small,
+  .launch-screen__status small,
   .mission-result__seal small {
     margin: 0;
   }
 
   .bio-link-status small::before,
   .warmup-sequence__status small::before,
+  .launch-screen__status small::before,
   .mission-result__seal small::before {
     color: #6f7162;
     content: ' / ';
@@ -2201,6 +2376,36 @@ button:disabled {
 
   .pre-mission__header {
     grid-template-columns: 1fr;
+  }
+
+  .launch-screen__header {
+    align-items: stretch;
+  }
+
+  .launch-screen__console {
+    gap: 0.7rem;
+  }
+
+  .crt-display--launch {
+    min-height: 20rem;
+    padding: 1.15rem;
+  }
+
+  .launch-screen h1 {
+    font-size: clamp(2.35rem, 12vw, 3.25rem);
+  }
+
+  .launch-screen__summary {
+    margin-top: 1rem;
+    font-size: 0.78rem;
+  }
+
+  .launch-screen__signal-line {
+    margin-top: 1.1rem;
+  }
+
+  .launch-screen__channel {
+    padding: 1rem 0.85rem;
   }
 
   .pre-mission__summary {
@@ -2271,7 +2476,8 @@ button:disabled {
   .crt-display--schematic,
   .crt-display--briefing,
   .crt-display--warmup,
-  .crt-display--sequence {
+  .crt-display--sequence,
+  .crt-display--launch {
     padding: 0.8rem;
   }
 
@@ -2357,6 +2563,7 @@ button:disabled {
   .active-mission__header,
   .pre-mission__header,
   .warmup-sequence__header,
+  .launch-screen__header,
   .mission-result__header {
     margin-bottom: 0.5rem;
     padding: 0.2rem 0.25rem 0.65rem;
@@ -2420,8 +2627,25 @@ button:disabled {
   .crt-display--schematic,
   .crt-display--briefing,
   .crt-display--warmup,
-  .crt-display--sequence {
+  .crt-display--sequence,
+  .crt-display--launch {
     padding: 0.2rem;
+  }
+
+  .launch-screen h1 {
+    font-size: 2rem;
+  }
+
+  .launch-screen__signal-line {
+    grid-template-columns: 1fr;
+  }
+
+  .launch-screen__signal-line span::after {
+    display: none;
+  }
+
+  .launch-screen__channel {
+    padding: 0.75rem 0.5rem;
   }
 
   .pre-mission__parameter-sheet {

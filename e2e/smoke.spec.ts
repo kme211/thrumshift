@@ -1,13 +1,16 @@
 import { expect, test } from '@playwright/test'
 
-test('shows the pre-mission flow without horizontal overflow', async ({
+test('shows the launch console and enters simulation without horizontal overflow', async ({
   page,
 }) => {
   await page.goto('/')
 
   await expect(page).toHaveTitle('Thrumshift')
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Reactor Cooling Failure' }),
+    page.getByRole('heading', {
+      level: 1,
+      name: 'Stay in range. Keep the station alive.',
+    }),
   ).toBeVisible()
   await expect(
     page.getByRole('heading', { name: 'Development telemetry diagnostics' }),
@@ -39,6 +42,15 @@ test('shows the pre-mission flow without horizontal overflow', async ({
       document.documentElement.clientWidth,
   )
   expect(hasHorizontalOverflow).toBe(false)
+
+  await page.getByRole('button', { name: 'Run Simulation' }).click()
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Reactor Cooling Failure' }),
+  ).toBeVisible()
+  await expect(page.getByText('Development telemetry source')).toHaveCount(0)
+  await expect(
+    page.getByRole('heading', { name: 'Development diagnostics' }),
+  ).toHaveCount(0)
 })
 
 test('removes nonessential transition time when reduced motion is requested', async ({
@@ -47,17 +59,15 @@ test('removes nonessential transition time when reduced motion is requested', as
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
 
-  const productRegion = page.getByRole('region', {
-    name: 'Reactor Cooling Failure',
-  })
-  const normalTransitionDuration = await productRegion.evaluate((element) =>
+  const statusLamp = page.locator('.launch-screen .status-lamp').first()
+  const normalTransitionDuration = await statusLamp.evaluate((element) =>
     Number.parseFloat(getComputedStyle(element).transitionDuration),
   )
 
   expect(normalTransitionDuration).toBeGreaterThan(0)
 
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  const reducedTransitionDuration = await productRegion.evaluate((element) =>
+  const reducedTransitionDuration = await statusLamp.evaluate((element) =>
     Number.parseFloat(getComputedStyle(element).transitionDuration),
   )
 

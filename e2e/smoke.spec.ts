@@ -1,5 +1,56 @@
 import { expect, test } from '@playwright/test'
 
+test('serves release metadata and the launch fallback on a direct URL', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'bluetooth', {
+      configurable: true,
+      value: undefined,
+    })
+  })
+
+  const response = await page.goto('/release-candidate-check')
+  expect(response?.ok()).toBe(true)
+
+  await expect(page).toHaveTitle('Thrumshift')
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+    'content',
+    'Thrumshift — stay in range and keep the station alive.',
+  )
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute(
+    'content',
+    '#10171b',
+  )
+
+  const iconLinks = page.locator(
+    'link[rel="icon"], link[rel="apple-touch-icon"]',
+  )
+  await expect(iconLinks).toHaveCount(4)
+  for (const href of await iconLinks.evaluateAll((links) =>
+    links.map((link) => (link as HTMLLinkElement).href),
+  )) {
+    const icon = await page.request.get(href)
+    expect(icon.ok()).toBe(true)
+    expect(icon.headers()['content-type']).toBe('image/png')
+  }
+
+  await expect(
+    page.getByRole('button', { name: 'Connect Bio-Link' }),
+  ).toBeDisabled()
+  await expect(
+    page.getByText(/Bio-link unavailable in this browser/i),
+  ).toBeVisible()
+
+  await page.reload()
+  await expect(
+    page.getByRole('heading', {
+      level: 1,
+      name: 'Stay in range. Keep the station alive.',
+    }),
+  ).toBeVisible()
+})
+
 test('shows the launch console and enters simulation without horizontal overflow', async ({
   page,
 }) => {

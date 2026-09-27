@@ -2,7 +2,7 @@
 
 Stay in range. Keep the station alive.
 
-This repository currently contains the Gate 7B mission-domain foundation for Thrumshift. In addition to the pre-mission and warm-up flow, it includes one pure, hand-authored coolant-routing puzzle, its isolated accessible workbench, and pure active-mission timeline, stability, ordered outcome, statistics, and immutable result-serialization rules. It does not include mission-controller or active-screen integration, result presentation or ratings, routing, backend, or persistence.
+Thrumshift is a browser game in which heart-rate telemetry affects station stability while the player restores coolant flow through a failing reactor system. The production flow includes the station-access launch console, an intentional 110 BPM simulator path, Web Bluetooth heart-rate input, briefing, warm-up, countdown, active play, suspension/reconnection, and mission results. The application is client-only: it has no backend, account system, or persistence.
 
 ## Requirements
 
@@ -68,9 +68,22 @@ npm run e2e:puzzle
 
 `npm run e2e:puzzle` opens the same development diagnostics entry used by the app and checks the workbench at phone/tablet sizes, a viewport orientation change, reduced motion, and a 200% zoom approximation. It does not create a second application or harness.
 
-## Static hosting
+## Cloudflare Pages deployment
 
-`npm run build` produces a portable static site in `dist`. Configure a static host to serve `index.html` as the fallback for unknown paths. Thrumshift does not currently use URL routing, but documenting the fallback keeps direct loads compatible if app-state URLs are ever approved. No provider-specific configuration or deployment is included.
+`npm run build` produces the production site in `dist`. Before creating a release, run the quality commands above from a clean `npm ci` installation.
+
+Create a Cloudflare Pages project connected to this repository with these settings:
+
+- Production branch: `main`
+- Framework preset: React (Vite)
+- Build command: `npm run build`
+- Build output directory: `dist`
+- Root directory: leave blank
+- Environment variables and secrets: none
+
+The committed `.nvmrc` pins the Pages build image to Node.js 22.12.0. No Pages Functions, Wrangler configuration, redirect file, or custom build adapter is required. Cloudflare Pages treats a project without a top-level `404.html` as a single-page application and serves `/` for unknown paths, so direct URL reloads reach the application shell.
+
+After the first successful deployment, attach a production hostname from the Pages project's **Custom domains** panel. If the hostname is in the same Cloudflare account, Pages can create the DNS record automatically. For DNS hosted elsewhere, associate the hostname in Pages first and then create the requested CNAME to the project's `<project-name>.pages.dev` hostname.
 
 ## Current styling scope
 

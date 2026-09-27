@@ -15,7 +15,17 @@ export function BioLinkStatus({
       aria-label="Bio-link status"
       data-link-state={connected ? 'connected' : transport.state}
     >
-      <span className="bio-link-status__lamp" aria-hidden="true" />
+      <span
+        className="status-lamp bio-link-status__lamp"
+        data-status={
+          connected
+            ? 'healthy'
+            : transport.state === 'error'
+              ? 'critical'
+              : 'inactive'
+        }
+        aria-hidden="true"
+      />
       <span>
         <strong>Bio-link:</strong> {connected ? 'connected' : transport.state}
         <span className="bio-link-status__separator">; </span>

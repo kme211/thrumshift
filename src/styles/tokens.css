@@ -24,4 +24,8 @@
   --display-green: #9fcf8d;
   --display-cyan: #79c5bd;
   --display-red: #d85d4a;
+  --font-equipment:
+    'Arial Narrow', 'Roboto Condensed', ui-sans-serif, system-ui, sans-serif;
+  --font-instrument:
+    ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
 }

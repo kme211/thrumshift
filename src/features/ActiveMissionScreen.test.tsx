@@ -102,6 +102,11 @@ describe('ActiveMissionScreen', () => {
     )
     expect(screen.getByText('Above range')).toBeInTheDocument()
     expect(screen.getByText('Target range: 100–140 BPM')).toBeInTheDocument()
+    const deckState = screen.getByText('STABILITY DEGRADING')
+    expect(deckState.querySelector('.status-lamp')).toHaveAttribute(
+      'data-status',
+      'critical',
+    )
     expect(
       screen.getByRole('meter', { name: 'Station stability' }),
     ).toHaveAttribute('aria-valuetext', 'Approximately 70 percent, decreasing')

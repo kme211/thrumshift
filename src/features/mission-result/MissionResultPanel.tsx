@@ -79,7 +79,7 @@ export function MissionResultPanel({
             </p>
           </div>
           <div className="mission-result__seal" aria-hidden="true">
-            <span className="status-lamp" />
+            <span className="status-lamp" data-status="healthy" />
             <span>
               REPORT SEALED
               <small>RUN ARCHIVE COMPLETE</small>
@@ -98,7 +98,10 @@ export function MissionResultPanel({
             </div>
             <div className="crt-display crt-display--result">
               <div className="mission-result__state" aria-hidden="true">
-                <span className="status-lamp" />
+                <span
+                  className="status-lamp"
+                  data-status={successful ? 'healthy' : 'critical'}
+                />
                 {successful ? 'SYSTEM RESTORED' : 'STABILITY DEPLETED'}
               </div>
               <h1 ref={headingRef} id="result-heading" tabIndex={-1}>
@@ -198,7 +201,10 @@ export function MissionResultPanel({
             <strong>ARCHIVE COMMITTED</strong>
           </div>
           <div className="control-deck__state" aria-hidden="true">
-            <span className="status-lamp" />
+            <span
+              className="status-lamp"
+              data-status={successful ? 'healthy' : 'critical'}
+            />
             RUN CLOSED
           </div>
           <button

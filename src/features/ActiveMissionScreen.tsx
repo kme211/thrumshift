@@ -96,6 +96,14 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
     (reason) => reason !== 'resumeRequired',
   )
   const interruptionKind = disconnected ? 'disconnect' : 'hold'
+  const missionBehavior = getMissionIntervalBehavior(mission)
+  const missionCondition =
+    missionBehavior === 'activeBelowRange' ||
+    missionBehavior === 'activeAboveRange'
+      ? 'degrading'
+      : missionBehavior === 'activeOperational' && mission.stability < 100
+        ? 'recovering'
+        : 'stable'
   const reasonText: Record<SuspensionReason, string> = {
     manual: 'You paused the mission.',
     resumeRequired: 'Your confirmation is required before play continues.',
@@ -146,7 +154,7 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
                 />
                 <StationStabilityMeter
                   stability={mission.stability}
-                  behavior={getMissionIntervalBehavior(mission)}
+                  behavior={missionBehavior}
                 />
               </div>
             </div>
@@ -187,12 +195,25 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
             <strong>LOCAL AUTHORITY</strong>
           </div>
           <div className="control-deck__state" aria-hidden="true">
-            <span className="status-lamp" />
-            MISSION ACTIVE
+            <span
+              className="status-lamp"
+              data-status={
+                missionCondition === 'degrading'
+                  ? 'critical'
+                  : missionCondition === 'recovering'
+                    ? 'warning'
+                    : 'healthy'
+              }
+            />
+            {missionCondition === 'degrading'
+              ? 'STABILITY DEGRADING'
+              : missionCondition === 'recovering'
+                ? 'STABILITY RECOVERING'
+                : 'MISSION ACTIVE'}
           </div>
           <button
             ref={pauseRef}
-            className="mission-pause"
+            className="equipment-button mission-pause"
             type="button"
             onClick={props.onPause}
             disabled={props.paused}
@@ -236,14 +257,20 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
             }
           }}
         >
-          <div className="interruption-dialog__label" aria-hidden="true">
+          <div
+            className="equipment-label interruption-dialog__label"
+            aria-hidden="true"
+          >
             <span>Mission control interlock</span>
             <span>MI-04 / {disconnected ? 'LINK OPEN' : 'OPERATOR HOLD'}</span>
           </div>
 
           <div className="crt-display crt-display--interruption">
             <div className="interruption-dialog__signal" aria-hidden="true">
-              <span className="status-lamp" />
+              <span
+                className="status-lamp"
+                data-status={disconnected ? 'critical' : 'warning'}
+              />
               {disconnected ? 'BIO-LINK INTERRUPTED' : 'HOLD ENGAGED'}
             </div>
             <p className="mission-eyebrow">Mission suspended</p>

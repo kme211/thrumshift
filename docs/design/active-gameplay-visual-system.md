@@ -42,6 +42,7 @@ Every semantic color is paired with text, shape, pattern, or position. Color alo
 - At 390px, the outer enclosure loses its corner fasteners and uses shallower casing depth. Module label strips, recessed CRT edges, state lamps, and physical control faces remain because they carry the equipment identity.
 - Narrow layouts condense secondary status metadata and omit the redundant control-bus legend. They do not shrink the coolant matrix, primary telemetry, or touch targets to recover space.
 - Development diagnostics remain outside the product console and use a quieter service-panel treatment.
+- The control-deck lamp and explicit state text track the same mission condition shown in telemetry: green `MISSION ACTIVE`, amber `STABILITY RECOVERING`, or red `STABILITY DEGRADING`.
 
 ## Motion and wear
 
@@ -53,3 +54,7 @@ Every semantic color is paired with text, shape, pattern, or position. Color alo
 ![Desktop active gameplay visual spike](./v1/desktop-active-110bpm.png)
 
 ![390px mobile active gameplay visual spike](./v1/mobile-active-110bpm.png)
+
+![Desktop degraded gameplay at 170 BPM](./v1/desktop-active-degraded.png)
+
+![390px degraded gameplay at 170 BPM](./v1/mobile-active-degraded.png)

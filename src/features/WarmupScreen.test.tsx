@@ -38,6 +38,9 @@ describe('WarmupScreen', () => {
       'Unusable signal',
     )
     expect(screen.getByText(/0 of 10 seconds/)).toBeInTheDocument()
+    expect(
+      screen.getByRole('list', { name: 'Readiness stages' }),
+    ).toHaveTextContent('01 / Bio-link')
   })
 
   it('renders domain countdown state without calculating qualification', () => {
@@ -77,6 +80,7 @@ describe('WarmupScreen', () => {
     expect(
       screen.getByRole('heading', { name: 'Mission countdown' }),
     ).toHaveFocus()
+    expect(screen.getByText('Transfer authorized')).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
   })
 

@@ -114,13 +114,19 @@ export function ControlledCoolantPuzzle({
       </div>
       <div className="coolant-puzzle__controls">
         <button
+          className="equipment-button"
           type="button"
           onClick={onHint}
           disabled={disabled || complete || !hintEligible}
         >
           Request hint
         </button>
-        <button type="button" onClick={onReset} disabled={disabled || complete}>
+        <button
+          className="equipment-button"
+          type="button"
+          onClick={onReset}
+          disabled={disabled || complete}
+        >
           Reset puzzle
         </button>
       </div>

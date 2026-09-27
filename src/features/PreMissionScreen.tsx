@@ -96,7 +96,17 @@ export function PreMissionScreen(props: PreMissionScreenProps) {
                 className="pre-mission__link-state"
                 data-link-state={linkState}
               >
-                <span className="bio-link-status__lamp" aria-hidden="true" />
+                <span
+                  className="status-lamp bio-link-status__lamp"
+                  data-status={
+                    linkState === 'connected'
+                      ? 'healthy'
+                      : linkState === 'error' || linkState === 'unavailable'
+                        ? 'critical'
+                        : 'inactive'
+                  }
+                  aria-hidden="true"
+                />
                 <p>
                   Connection: <strong>{linkState}</strong>
                 </p>
@@ -171,7 +181,10 @@ export function PreMissionScreen(props: PreMissionScreenProps) {
             data-ready={props.canBegin}
             aria-hidden="true"
           >
-            <span className="status-lamp" />
+            <span
+              className="status-lamp"
+              data-status={props.canBegin ? 'healthy' : 'inactive'}
+            />
             {props.canBegin ? 'WARM-UP READY' : 'SETUP REQUIRED'}
           </div>
           <button

@@ -39,7 +39,9 @@ export function LaunchScreen({
 
         <header className="launch-screen__header">
           <div className="launch-screen__identity">
-            <p className="equipment-kicker">Thrumshift / Station 04</p>
+            <p className="equipment-kicker">
+              KESS SYSTEMS // THRUMSHIFT STATION 04
+            </p>
             <p className="mission-eyebrow">Station access console</p>
           </div>
           <div className="launch-screen__status" aria-hidden="true">
@@ -76,6 +78,9 @@ export function LaunchScreen({
                 <span>STABILITY</span>
                 <span>COOLANT ROUTE</span>
               </div>
+              <p className="launch-screen__corporate-line" aria-hidden="true">
+                OPERATIONAL CONTINUITY, ENGINEERED.
+              </p>
             </div>
           </section>
 

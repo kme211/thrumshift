@@ -23,6 +23,12 @@ describe('LaunchScreen', () => {
         name: 'Stay in range. Keep the station alive.',
       }),
     ).toHaveFocus()
+    expect(
+      screen.getByText('KESS SYSTEMS // THRUMSHIFT STATION 04'),
+    ).toBeVisible()
+    expect(
+      screen.getByText('OPERATIONAL CONTINUITY, ENGINEERED.'),
+    ).toBeVisible()
     expect(screen.getByText(/Heart-rate telemetry drives/)).toBeVisible()
     expect(
       screen.getByText('Compatible Bluetooth heart-rate monitor required.'),

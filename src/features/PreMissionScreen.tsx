@@ -43,15 +43,20 @@ export function PreMissionScreen(props: PreMissionScreenProps) {
         <header className="pre-mission__header">
           <div className="pre-mission__identity">
             <p className="equipment-kicker">
-              <span>Thrumshift</span> / Station 04
+              KESS SYSTEMS // THRUMSHIFT STATION 04
             </p>
             <p className="mission-eyebrow">Mission briefing</p>
             <h1 ref={headingRef} id="screen-heading" tabIndex={-1}>
               Reactor Cooling Failure
             </h1>
+            <p className="pre-mission__classification">
+              INCIDENT CLASSIFICATION: ROUTINE OPERATIONAL RECOVERY
+            </p>
             <p className="pre-mission__summary">
               Keep your movement steady while you restore the station’s cooling
-              controls.
+              controls. Primary coolant routing is offline. Environmental
+              Systems coverage remains under reduced staffing authorization.
+              Restore local coolant flow and maintain station stability.
             </p>
           </div>
           <p className="pre-mission__motto">

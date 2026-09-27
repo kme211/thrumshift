@@ -286,6 +286,17 @@ button:disabled {
   line-height: 1.55;
 }
 
+.pre-mission__classification {
+  margin: 0.55rem 0 0;
+  color: var(--display-amber-dim);
+  font-family: var(--font-equipment);
+  font-size: 0.62rem;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  line-height: 1.45;
+  text-transform: uppercase;
+}
+
 .pre-mission__motto {
   margin: 0 0 0.15rem;
   padding: 0.25rem 0 0.25rem 0.85rem;
@@ -464,6 +475,16 @@ button:disabled {
   margin-left: 0.55rem;
   color: var(--display-amber-dim);
   content: '›';
+}
+
+.launch-screen__corporate-line {
+  margin: 0.9rem 0 0;
+  color: #7f9588;
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  line-height: 1.45;
+  text-transform: uppercase;
 }
 
 .launch-screen__access {
@@ -1042,6 +1063,13 @@ button:disabled {
   line-height: 1.45;
 }
 
+.warmup-sequence__wellness-note {
+  margin: 0.65rem 0 0;
+  color: #7f9588;
+  font-size: 0.66rem;
+  line-height: 1.45;
+}
+
 .warmup-sequence__reconnect {
   margin-top: 1rem;
   padding: 0.8rem;
@@ -1346,6 +1374,26 @@ button:disabled {
   color: #b8b7a9;
   font-size: 0.9rem;
   line-height: 1.55;
+}
+
+.mission-result__personnel {
+  max-width: 30ch;
+  margin: 1.1rem 0 0;
+  color: var(--display-amber);
+  font-family: var(--font-equipment);
+  font-size: clamp(1.05rem, 3vw, 1.5rem);
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.mission-result__review-note {
+  max-width: 42ch;
+  margin: 0.9rem 0 0;
+  color: #b8b7a9;
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .mission-result__duration {
@@ -2069,6 +2117,13 @@ button:disabled {
   .mission-result__record {
     grid-column: 2;
     grid-row: 1 / span 2;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mission-result__record .mission-result__ledger {
+    flex: 1;
   }
 
   .mission-result__rating {

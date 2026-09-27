@@ -145,7 +145,9 @@ async function finishSuccessfulFlow(
     fireEvent.click(screen.getByRole('button', { name }))
   }
   expect(
-    await screen.findByRole('heading', { name: 'Mission successful' }),
+    await screen.findByRole('heading', {
+      name: 'SYSTEM RESTORED',
+    }),
   ).toHaveFocus()
 }
 
@@ -157,7 +159,9 @@ async function finishFailedFlow(
     act(() => flow.simulatedSource.emitSample(170))
   }
   expect(
-    await screen.findByRole('heading', { name: 'Mission failed' }),
+    await screen.findByRole('heading', {
+      name: 'SYSTEM NOT RESTORED',
+    }),
   ).toHaveFocus()
 }
 
@@ -638,7 +642,9 @@ describe('AppFlow pre-mission and warm-up integration', () => {
     await enterActiveFlow(flow, 100_000, false)
     await finishSuccessfulFlow(flow, 100_000)
     expect(
-      screen.getByRole('heading', { name: 'Mission successful' }),
+      screen.getByRole('heading', {
+        name: 'SYSTEM RESTORED',
+      }),
     ).toBeInTheDocument()
     const laterResultCallback = callbacks.at(-1)
     expect(laterResultCallback).not.toBe(firstResultCallback)
@@ -646,7 +652,9 @@ describe('AppFlow pre-mission and warm-up integration', () => {
     flow.setTime(117_000)
     act(() => firstResultCallback?.())
     expect(
-      screen.getByRole('heading', { name: 'Mission successful' }),
+      screen.getByRole('heading', {
+        name: 'SYSTEM RESTORED',
+      }),
     ).toBeInTheDocument()
 
     flow.setTime(117_100)

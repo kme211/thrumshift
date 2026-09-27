@@ -12,10 +12,11 @@ The production launch console is a lightweight station-access state before the e
 
 ## Approved copy
 
-- Identity: `THRUMSHIFT / STATION 04`
+- Identity: `KESS SYSTEMS // THRUMSHIFT STATION 04`
 - State: `STATION ACCESS CONSOLE`
 - Tagline: `Stay in range. Keep the station alive.`
 - Premise: `Heart-rate telemetry drives station stability while you restore coolant flow through a failing reactor system.`
+- Corporate line: `OPERATIONAL CONTINUITY, ENGINEERED.`
 - Primary action: `RUN SIMULATION`
 - Simulation note: `No monitor required. Runs a stable 110 BPM training signal.`
 - Secondary action: `CONNECT BIO-LINK`

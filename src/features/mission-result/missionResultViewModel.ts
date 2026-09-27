@@ -23,6 +23,8 @@ export interface MissionResultViewModel {
   readonly outcome: MissionResult['outcome']
   readonly heading: string
   readonly summary: string
+  readonly personnelRequired: string | null
+  readonly reviewNote: string | null
   readonly duration: MetricViewModel
   readonly coreMetrics: readonly MetricViewModel[]
   readonly rangeMetrics: readonly RangeMetricViewModel[] | null
@@ -260,11 +262,15 @@ export function createMissionResultViewModel(
   return {
     outcome: result.outcome,
     heading:
-      result.outcome === 'success' ? 'Mission successful' : 'Mission failed',
+      result.outcome === 'success' ? 'SYSTEM RESTORED' : 'SYSTEM NOT RESTORED',
     summary:
       result.outcome === 'success'
-        ? 'The coolant route was restored before station stability was lost.'
-        : 'Station stability reached zero before the coolant route was completed.',
+        ? 'Coolant routing returned to acceptable operating parameters.'
+        : 'Intervention terminated outside acceptable stability parameters.',
+    personnelRequired:
+      result.outcome === 'success' ? 'ADDITIONAL PERSONNEL REQUIRED: 0' : null,
+    reviewNote:
+      result.outcome === 'failure' ? 'Incident forwarded for review.' : null,
     duration: durationMetric(
       result.outcome === 'success' ? 'Completion time' : 'Mission duration',
       result.missionDurationMs,

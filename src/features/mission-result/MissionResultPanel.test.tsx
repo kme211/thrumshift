@@ -16,12 +16,18 @@ describe('MissionResultPanel', () => {
     )
     const heading = screen.getByRole('heading', {
       level: 1,
-      name: 'Mission successful',
+      name: 'SYSTEM RESTORED',
     })
     expect(heading).toHaveFocus()
     expect(
-      screen.getByRole('region', { name: 'Mission successful' }),
+      screen.getByRole('region', { name: 'SYSTEM RESTORED' }),
     ).toHaveAttribute('data-outcome', 'success')
+    expect(
+      screen.getByText(
+        'Coolant routing returned to acceptable operating parameters.',
+      ),
+    ).toBeVisible()
+    expect(screen.getByText('ADDITIONAL PERSONNEL REQUIRED: 0')).toBeVisible()
     expect(screen.getByText('Completion time')).toBeInTheDocument()
     expect(screen.getByText('1:10')).toHaveAttribute('aria-hidden', 'true')
     expect(screen.getByText('1 minute 10 seconds')).toHaveClass('sr-only')
@@ -35,7 +41,7 @@ describe('MissionResultPanel', () => {
       ({ textContent }) => textContent,
     )
     expect(headings).toEqual([
-      'Mission successful',
+      'SYSTEM RESTORED',
       'Mission overview',
       'Time in gameplay range',
       'Mission events',
@@ -53,13 +59,27 @@ describe('MissionResultPanel', () => {
       />,
     )
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Mission failed' }),
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'SYSTEM NOT RESTORED',
+      }),
     ).toHaveFocus()
+    expect(
+      screen.getByText(
+        'Intervention terminated outside acceptable stability parameters.',
+      ),
+    ).toBeVisible()
+    expect(screen.getByText('Incident forwarded for review.')).toBeVisible()
+    expect(
+      screen.queryByText('ADDITIONAL PERSONNEL REQUIRED: 0'),
+    ).not.toBeInTheDocument()
     expect(screen.getByText('Mission duration')).toBeVisible()
     expect(screen.queryByText('Completion time')).not.toBeInTheDocument()
     expect(screen.getAllByText('Incomplete').length).toBeGreaterThanOrEqual(1)
     expect(
-      screen.getByRole('region', { name: 'Mission failed' }),
+      screen.getByRole('region', {
+        name: 'SYSTEM NOT RESTORED',
+      }),
     ).toHaveAttribute('data-outcome', 'failure')
   })
 

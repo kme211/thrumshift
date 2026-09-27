@@ -96,22 +96,23 @@ Human writing should sound more natural, frustrated, practical, and occasionally
 
 # The company
 
-## Working concept
+## Kess Systems
 
-Station 04 belongs to a large privately controlled organization associated with founder and owner Adrian Kess.
+The company is named **Kess Systems**.
 
-The final corporate name is not yet locked.
+Kess Systems owns and operates Station 04.
 
-Possible structures include:
+The station is both a working facility and a proof point for Kess Systems' high-autonomy, reduced-headcount operating model.
 
-- Kess Systems
-- Kess Industries
-- Kess Orbital
-- a neutral corporate name under the Kess ownership umbrella
+Kess Systems makes money through infrastructure systems, automation, managed operations, operational-continuity tooling, and efficiency/optimization services sold to other organizations.
 
 The corporation should be large enough that most employees never interact directly with Adrian Kess.
 
 To a front-line worker, "Kess" is more likely to appear on branding, initiatives, executive communications, building names, leadership principles, and strategic programs than as an actual person.
+
+## Thrumshift as a product name
+
+Treat the idea that "Thrumshift" is also the name of Kess Systems' operating framework or product as **provisional**, not hard canon yet. The game can use "Thrumshift" as the station console identity without committing to whether it is an internal framework, a marketed product, or both.
 
 ---
 
@@ -540,7 +541,7 @@ A successful mission should end with corporate interpretation rather than celebr
 
 Suggested concept:
 
-## OPERATIONAL CONTINUITY RESTORED
+## SYSTEM RESTORED
 
 Coolant routing returned to acceptable operating parameters.
 
@@ -560,7 +561,7 @@ Failure should remain bureaucratic rather than melodramatic.
 
 Possible language:
 
-## OPERATIONAL CONTINUITY NOT RESTORED
+## SYSTEM NOT RESTORED
 
 Intervention terminated outside acceptable stability parameters.
 
@@ -796,7 +797,6 @@ Satire should strengthen the game rather than interrupt it.
 
 These should remain intentionally unresolved for now.
 
-- What is the corporation called?
 - What is Station 04's larger strategic purpose?
 - Where is Station 04 physically located?
 - How large was the original crew?
@@ -836,6 +836,10 @@ Before v1 ships, the narrative pass should aim to establish:
 The following elements are currently considered stable:
 
 - The game takes place aboard Station 04.
+- The corporation operating Station 04 is named Kess Systems.
+- Kess Systems owns and operates Station 04.
+- Station 04 functions as both a working facility and a proof point for Kess Systems' high-autonomy, reduced-headcount operating model.
+- Kess Systems generates revenue through infrastructure systems, automation, managed operations, operational-continuity tooling, and efficiency/optimization services.
 - Mara Sato is an Environmental Systems Engineer.
 - Adrian Kess is the founder / ownership figure behind the organization.
 - Station 04 has experienced significant operational efficiency initiatives.

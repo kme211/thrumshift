@@ -39,6 +39,11 @@ describe('WarmupScreen', () => {
     )
     expect(screen.getByText(/0 of 10 seconds/)).toBeInTheDocument()
     expect(
+      screen.getByText(
+        'Operator regulation supports optimal mission performance.',
+      ),
+    ).toBeVisible()
+    expect(
       screen.getByRole('list', { name: 'Readiness stages' }),
     ).toHaveTextContent('01 / Bio-link')
   })

@@ -4,7 +4,7 @@ Mission suspension extends the approved active-gameplay console as a temporary s
 
 ## Shared interruption enclosure
 
-- The native modal dialog is presented as a docked `MI-04` mission-control interlock rather than a generic centered web modal.
+- The native modal dialog is presented as a docked `KS-MI-04` mission-control interlock rather than a generic centered web modal.
 - A printed equipment strip identifies the subsystem and current interlock mode. The recessed CRT surface contains state, explanation, and suspension reasons; the physical control bank contains recovery and end-run actions.
 - The backdrop is dark enough to establish input priority but remains translucent and unblurred so mission identity, telemetry, stability, and routing context remain recognizable.
 - “Mission paused” remains the semantic heading. “Mission suspended,” the frozen-state explanation, and explicit reason text distinguish this temporary state from mission failure.

@@ -68,7 +68,10 @@ async function finishRepresentativeSuccess(page: Page, origin = 0) {
   }
   await solvePuzzle(page, origin + 22_000)
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Mission successful' }),
+    page.getByRole('heading', {
+      level: 1,
+      name: 'SYSTEM RESTORED',
+    }),
   ).toBeFocused()
 }
 
@@ -78,7 +81,10 @@ async function finishRepresentativeFailure(page: Page) {
   }
   await emitSample(page, 54_000, 170)
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Mission failed' }),
+    page.getByRole('heading', {
+      level: 1,
+      name: 'SYSTEM NOT RESTORED',
+    }),
   ).toBeFocused({ timeout: 5_000 })
 }
 
@@ -216,7 +222,10 @@ test('shows sparse signal honestly and resets puzzle, metrics, and warm-up twice
   await enterMission(page)
   await solvePuzzle(page, 16_000)
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Mission successful' }),
+    page.getByRole('heading', {
+      level: 1,
+      name: 'SYSTEM RESTORED',
+    }),
   ).toBeFocused()
   await expect(
     page.getByText(/usable signal data was insufficient/i),
@@ -275,11 +284,14 @@ test('result remains usable in portrait, landscape, 200% zoom, forced colors, an
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
   await expect(page.getByText('Mission result')).toBeVisible()
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Mission successful' }),
+    page.getByRole('heading', {
+      level: 1,
+      name: 'SYSTEM RESTORED',
+    }),
   ).toBeVisible()
   expect(
     await page
-      .getByRole('region', { name: 'Mission successful' })
+      .getByRole('region', { name: 'SYSTEM RESTORED' })
       .evaluate((element) =>
         Number.parseFloat(getComputedStyle(element).transitionDuration),
       ),

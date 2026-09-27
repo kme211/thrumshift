@@ -71,7 +71,7 @@ export function MissionResultPanel({
         <header className="mission-result__header">
           <div>
             <p className="equipment-kicker">
-              <span>Thrumshift</span> / Station 04
+              KESS SYSTEMS // THRUMSHIFT STATION 04
             </p>
             <p className="mission-eyebrow">Mission result</p>
             <p className="mission-result__mission-name">
@@ -94,7 +94,7 @@ export function MissionResultPanel({
           >
             <div className="equipment-label" aria-hidden="true">
               <span>Mission disposition</span>
-              <span>MR-04 / {successful ? 'RESTORED' : 'DEPLETED'}</span>
+              <span>MR-04 / {successful ? 'RESTORED' : 'NOT RESTORED'}</span>
             </div>
             <div className="crt-display crt-display--result">
               <div className="mission-result__state" aria-hidden="true">
@@ -102,12 +102,22 @@ export function MissionResultPanel({
                   className="status-lamp"
                   data-status={successful ? 'healthy' : 'critical'}
                 />
-                {successful ? 'SYSTEM RESTORED' : 'STABILITY DEPLETED'}
+                {successful
+                  ? 'KESS SYSTEMS // OPERATIONAL RECORD'
+                  : 'KESS SYSTEMS // INCIDENT REVIEW'}
               </div>
               <h1 ref={headingRef} id="result-heading" tabIndex={-1}>
                 {view.heading}
               </h1>
               <p className="mission-result__summary">{view.summary}</p>
+              {view.personnelRequired === null ? null : (
+                <p className="mission-result__personnel">
+                  {view.personnelRequired}
+                </p>
+              )}
+              {view.reviewNote === null ? null : (
+                <p className="mission-result__review-note">{view.reviewNote}</p>
+              )}
               <div className="mission-result__duration">
                 <p>{view.duration.label}</p>
                 <strong>

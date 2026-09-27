@@ -1,6 +1,6 @@
 # Mission result visual-system rollout
 
-Mission results extend the approved equipment system as terminal run reports. Success and failure share one installed report console, data hierarchy, and replay control; outcome-specific labels and limited semantic color communicate the final system state. Existing result content, accessibility text, heading order, focus behavior, and replay flow remain unchanged.
+Mission results extend the approved equipment system as terminal run reports. Success and failure share one installed report console, data hierarchy, and replay control; outcome-specific labels and limited semantic color communicate the final system state. Existing result accessibility text, heading order, focus behavior, and replay flow remain unchanged, while the outcome copy now frames the run as a Kess Systems operational record.
 
 ## Shared terminal-report console
 
@@ -12,8 +12,8 @@ Mission results extend the approved equipment system as terminal run reports. Su
 
 ## Success and failure distinction
 
-- Success is identified as `SYSTEM RESTORED` and `MR-04 / RESTORED`. Green is limited to the restored-state lamp, confirmed healthy values, completed route, and successful performance classification.
-- Failure is identified as `STABILITY DEPLETED` and `MR-04 / DEPLETED`. Red is limited to the failure-state lamp, zero station stability, incomplete route, above-range history when present, and the incomplete classification.
+- Success is identified as `SYSTEM RESTORED`, `KESS SYSTEMS // OPERATIONAL RECORD`, and `MR-04 / RESTORED`. The successful disposition carries the dry staffing record `ADDITIONAL PERSONNEL REQUIRED: 0`. Green is limited to the restored-state lamp, confirmed healthy values, completed route, and successful performance classification.
+- Failure is identified as `SYSTEM NOT RESTORED`, `KESS SYSTEMS // INCIDENT REVIEW`, and `MR-04 / NOT RESTORED`. The failed disposition carries the bureaucratic note `Incident forwarded for review.` Red is limited to the failure-state lamp, zero station stability, incomplete route, above-range history when present, and the incomplete classification.
 - Outcome headings remain neutral cream. Failure does not alter the enclosure, backdrop, or whole display to red and does not use “game over” language.
 - Zero-percent below/above values remain neutral. Semantic warning colors appear only when the corresponding condition actually occurred.
 - Both outcomes retain the same metrics and report structure, making the difference legible as machine state rather than celebration or punishment.

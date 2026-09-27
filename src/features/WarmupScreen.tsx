@@ -103,7 +103,9 @@ export function WarmupScreen(props: WarmupScreenProps) {
 
         <header className="warmup-sequence__header">
           <div className="warmup-sequence__identity">
-            <p className="equipment-kicker">Thrumshift / Station 04</p>
+            <p className="equipment-kicker">
+              KESS SYSTEMS // THRUMSHIFT STATION 04
+            </p>
             <p className="mission-eyebrow">Reactor Cooling Failure</p>
             <h1 ref={headingRef} id="screen-heading" tabIndex={-1}>
               {countdown ? 'Mission countdown' : 'Warm-up'}
@@ -182,6 +184,9 @@ export function WarmupScreen(props: WarmupScreenProps) {
               <p className="warmup-sequence__telemetry-note">
                 Latest BPM updates immediately; gameplay status requires stable
                 fresh evidence.
+              </p>
+              <p className="warmup-sequence__wellness-note">
+                Operator regulation supports optimal mission performance.
               </p>
             </div>
             {props.status.state !== 'connected' ? (

@@ -130,7 +130,9 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
 
         <header className="active-mission__header">
           <div className="active-mission__identity">
-            <p className="equipment-kicker">THRUMSHIFT / STATION 04</p>
+            <p className="equipment-kicker">
+              KESS SYSTEMS // THRUMSHIFT STATION 04
+            </p>
             <p className="mission-eyebrow">Active mission</p>
             <h1 ref={headingRef} tabIndex={-1} id="active-mission-heading">
               Reactor Cooling Failure
@@ -183,7 +185,7 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
           >
             <div className="equipment-label" aria-hidden="true">
               <span>Coolant route matrix</span>
-              <span>CR-03 / LOCAL</span>
+              <span>KS-CR-03 / LOCAL</span>
             </div>
             <div className="crt-display crt-display--schematic">
               <ControlledCoolantPuzzle
@@ -275,7 +277,9 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
             aria-hidden="true"
           >
             <span>Mission control interlock</span>
-            <span>MI-04 / {disconnected ? 'LINK OPEN' : 'OPERATOR HOLD'}</span>
+            <span>
+              KS-MI-04 / {disconnected ? 'LINK OPEN' : 'OPERATOR HOLD'}
+            </span>
           </div>
 
           <div className="crt-display crt-display--interruption">

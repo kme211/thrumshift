@@ -28,6 +28,17 @@ function renderScreen(
 }
 
 describe('PreMissionScreen', () => {
+  it('frames the incident as a reduced-staffing operational recovery', () => {
+    renderScreen()
+    expect(
+      screen.getByText('INCIDENT CLASSIFICATION: ROUTINE OPERATIONAL RECOVERY'),
+    ).toBeVisible()
+    expect(
+      screen.getByText(/Environmental Systems coverage remains under reduced/i),
+    ).toBeVisible()
+    expect(screen.getByText(/Restore local coolant flow/)).toBeVisible()
+  })
+
   it('explains unsupported and insecure browser states clearly', () => {
     renderScreen({ capability: { supported: false, reason: 'unsupported' } })
     expect(screen.getByText(/unavailable in this browser/i)).toBeInTheDocument()

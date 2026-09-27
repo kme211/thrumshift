@@ -90,8 +90,12 @@ describe('mission result view model', () => {
 
   it('formats a representative successful result', () => {
     const view = createMissionResultViewModel(buildMissionResult())
-    expect(view.heading).toBe('Mission successful')
-    expect(view.summary).toContain('coolant route was restored')
+    expect(view.heading).toBe('SYSTEM RESTORED')
+    expect(view.summary).toBe(
+      'Coolant routing returned to acceptable operating parameters.',
+    )
+    expect(view.personnelRequired).toBe('ADDITIONAL PERSONNEL REQUIRED: 0')
+    expect(view.reviewNote).toBeNull()
     expect(view.duration).toEqual({
       label: 'Completion time',
       value: '1:10',
@@ -125,7 +129,12 @@ describe('mission result view model', () => {
 
   it('uses mission-duration language for failure', () => {
     const view = createMissionResultViewModel(buildFailedMissionResult())
-    expect(view.heading).toBe('Mission failed')
+    expect(view.heading).toBe('SYSTEM NOT RESTORED')
+    expect(view.summary).toBe(
+      'Intervention terminated outside acceptable stability parameters.',
+    )
+    expect(view.personnelRequired).toBeNull()
+    expect(view.reviewNote).toBe('Incident forwarded for review.')
     expect(view.duration.label).toBe('Mission duration')
     expect(view.duration.label).not.toContain('Completion')
     expect(view.puzzleMetrics[0]).toEqual({

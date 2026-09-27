@@ -15,7 +15,9 @@ describe('App', () => {
         name: 'Stay in range. Keep the station alive.',
       }),
     ).toBeInTheDocument()
-    expect(screen.getByText(/Thrumshift \/ Station 04/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/KESS SYSTEMS \/\/ THRUMSHIFT STATION 04/i),
+    ).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Run Simulation' }))
     expect(

@@ -33,6 +33,8 @@ Thrumshift is installed station equipment, not a themed web dashboard. The physi
 
 Every semantic color is paired with text, shape, pattern, or position. Color alone never carries gameplay meaning.
 
+Out-of-range classification also carries direction independent of color: `▲ ABOVE RANGE` and `▼ BELOW RANGE`. Operational and pending states retain the neutral `◆` and `◇` markers.
+
 ## Layout rules
 
 - Desktop uses one console frame with a top identity/status rail, two unequal equipment bays, and a bottom command row.

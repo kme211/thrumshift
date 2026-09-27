@@ -2,6 +2,7 @@ import type {
   RangeClassification,
   TargetRange,
 } from '../../domain/heart-rate/classifier'
+import { rangeClassificationIndicator } from './rangeClassificationIndicator'
 
 const labels: Record<RangeClassification, string> = {
   below: 'Below range',
@@ -39,11 +40,7 @@ export function OperationalRangeGauge({
         data-classification={classification ?? 'pending'}
       >
         <span aria-hidden="true">
-          {classification === 'operational'
-            ? '◆'
-            : classification === null
-              ? '◇'
-              : '▲'}
+          {rangeClassificationIndicator(classification)}
         </span>{' '}
         {classificationLabel(classification)}
       </p>

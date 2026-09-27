@@ -7,6 +7,7 @@ import {
 } from '../domain/mission/warmup'
 import type { WarmupSession } from '../app/WarmupSession'
 import type { TelemetrySourceStatus } from '../telemetry/HeartRateTelemetrySource'
+import { rangeClassificationIndicator } from '../components/mission/rangeClassificationIndicator'
 import { SegmentedIndicatorBank } from '../components/mission/SegmentedIndicatorBank'
 import { TargetRangeFields } from './TargetRangeFields'
 
@@ -155,11 +156,9 @@ export function WarmupScreen(props: WarmupScreenProps) {
                 data-state={classificationState}
               >
                 <span aria-hidden="true">
-                  {classificationState === 'healthy'
-                    ? '◆'
-                    : classificationState === 'critical'
-                      ? '▲'
-                      : '◇'}
+                  {rangeClassificationIndicator(
+                    classifier.stableClassification,
+                  )}
                 </span>{' '}
                 <span
                   key={classificationHeadline(props.session)}

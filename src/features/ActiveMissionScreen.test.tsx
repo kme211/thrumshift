@@ -101,6 +101,9 @@ describe('ActiveMissionScreen', () => {
       '148 BPM',
     )
     expect(screen.getByText('Above range')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('group', { name: 'Simulator heart-rate output' }),
+    ).not.toBeInTheDocument()
     expect(screen.getByText('Target range: 100–140 BPM')).toBeInTheDocument()
     const deckState = screen.getByText('STABILITY DEGRADING')
     expect(deckState.querySelector('.status-lamp')).toHaveAttribute(

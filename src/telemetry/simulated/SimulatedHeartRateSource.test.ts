@@ -35,6 +35,9 @@ describe('SimulatedHeartRateSource', () => {
       expect.objectContaining({ bpm: 72 }),
     )
     source.setContinuousBpm(88)
+    expect(samples).toHaveBeenLastCalledWith(
+      expect.objectContaining({ bpm: 88, occurrenceTimeMs: 0 }),
+    )
     time = 1_095
     await vi.advanceTimersByTimeAsync(1_095)
 
@@ -46,6 +49,7 @@ describe('SimulatedHeartRateSource', () => {
       bpm: 88,
       cadenceMs: 1_095,
     })
+    expect(samples).toHaveBeenCalledTimes(3)
     vi.useRealTimers()
   })
 

@@ -73,6 +73,27 @@ async function rotateAndCheckFocusedEdgeTile(
   expect(focus.right + focusExtent).toBeLessThanOrEqual(focus.viewportWidth)
 }
 
+test('simulator presets feed the normal active-mission telemetry path', async ({
+  page,
+}) => {
+  await enterActiveMission(page)
+  const inRange = page.getByRole('button', { name: 'In range 110 BPM' })
+  const high = page.getByRole('button', { name: 'High 160 BPM' })
+
+  await expect(inRange).toHaveAttribute('aria-pressed', 'true')
+  await high.click()
+
+  await expect(page.getByLabel('Current simulated heart rate')).toHaveText(
+    /160\s+BPM/,
+  )
+  await expect(high).toHaveAttribute('aria-pressed', 'true')
+  await expect(
+    page
+      .getByRole('region', { name: 'Current heart rate' })
+      .getByText(/Above range/),
+  ).toBeVisible({ timeout: 5_000 })
+})
+
 for (const viewport of [
   { name: 'narrow phone portrait', width: 360, height: 640 },
   { name: 'larger phone or tablet', width: 768, height: 1024 },

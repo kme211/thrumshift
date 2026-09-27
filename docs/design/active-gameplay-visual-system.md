@@ -15,6 +15,7 @@ Thrumshift is installed station equipment, not a themed web dashboard. The physi
 - `control-deck`: the persistent command row for current mode and high-level actions. Controls communicate ongoing state; important actions are visually separated from routine puzzle input.
 - `status-lamp`: a persistent indicator paired with text. Illumination reports equipment state and is never used as click celebration.
 - `segmented-indicator-bank`: ten persistent rectangular lamps used for quantized qualification and station reserve. It changes discrete lamp states rather than animating a fill width.
+- `simulator-output`: a compact physical preset bank available only when the simulator source is active. It reports the current training signal and uses persistent selected-state illumination rather than diagnostic form controls.
 
 ## Typography roles
 
@@ -45,6 +46,8 @@ Out-of-range classification also carries direction independent of color: `▲ AB
 - At 390px, the outer enclosure loses its corner fasteners and uses shallower casing depth. Module label strips, recessed CRT edges, state lamps, and physical control faces remain because they carry the equipment identity.
 - Narrow layouts condense secondary status metadata and omit the redundant control-bus legend. They do not shrink the coolant matrix, primary telemetry, or touch targets to recover space.
 - Development diagnostics remain outside the product console and use a quieter service-panel treatment.
+- Simulator mode adds `SIM-04 OUTPUT CONTROL` beneath the Biometric Regulator instructions. `LOW` (90 BPM), `IN RANGE` (110 BPM), and `HIGH` (160 BPM) are fixed training presets; the active output is repeated as a numeric readout and an illuminated `aria-pressed` control.
+- The simulator output bank is absent in Bluetooth mode. It calls the simulator source directly, so BPM changes still pass through the normal telemetry, classification, stability, and mission systems.
 - The control-deck lamp and explicit state text track the same mission condition shown in telemetry: green `MISSION ACTIVE`, amber `STABILITY RECOVERING`, or red `STABILITY DEGRADING`.
 
 ## Motion and wear
@@ -61,3 +64,7 @@ Out-of-range classification also carries direction independent of color: `▲ AB
 ![Desktop degraded gameplay at 170 BPM](./v1/desktop-active-degraded.png)
 
 ![390px degraded gameplay at 170 BPM](./v1/mobile-active-degraded.png)
+
+![Desktop simulator output control](./v1/desktop-active-simulator-control.png)
+
+![390px simulator output control](./v1/mobile-active-simulator-control-390px.png)

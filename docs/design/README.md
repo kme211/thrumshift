@@ -17,6 +17,8 @@
 - [Version 1 mobile reference](./v1/mobile-active-110bpm.png): the same active mission adapted for a 390px viewport
 - [Version 1 desktop degraded reference](./v1/desktop-active-degraded.png): active mission at 170 BPM with station stability decreasing
 - [Version 1 mobile degraded reference](./v1/mobile-active-degraded.png): the same degraded mission adapted for a 390px viewport
+- [Version 1 desktop simulator-control reference](./v1/desktop-active-simulator-control.png): simulator-mode active mission with the compact `SIM-04` preset bank
+- [Version 1 mobile simulator-control reference](./v1/mobile-active-simulator-control-390px.png): the simulator preset bank adapted for a 390px viewport
 - [Version 1 desktop briefing reference](./v1/desktop-briefing-ready-110bpm.png): connected briefing at 110 BPM with valid mission parameters
 - [Version 1 mobile briefing reference](./v1/mobile-briefing-ready-110bpm.png): the same ready briefing adapted for a 390px viewport
 - [Version 1 desktop warm-up reference](./v1/desktop-warmup-110bpm.png): progressive operational qualification at a stable 110 BPM

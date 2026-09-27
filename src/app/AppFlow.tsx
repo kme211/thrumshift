@@ -21,6 +21,7 @@ import type { HeartRateTelemetrySource } from '../telemetry/HeartRateTelemetrySo
 import type { WebBluetoothHeartRateSource } from '../telemetry/bluetooth/WebBluetoothHeartRateSource'
 import {
   SIMULATED_HR6_CADENCE_MS,
+  type ContinuousEmissionState,
   type SimulatedHeartRateSource,
 } from '../telemetry/simulated/SimulatedHeartRateSource'
 import {
@@ -134,6 +135,10 @@ export function AppFlow({
   const [selectedSource, setSelectedSource] = useState<
     'simulated' | 'bluetooth'
   >(initialSource)
+  const [simulatedEmission, setSimulatedEmission] =
+    useState<ContinuousEmissionState | null>(
+      () => simulatedSource?.getContinuousEmissionState() ?? null,
+    )
   const source: HeartRateTelemetrySource =
     selectedSource === 'simulated' && simulatedSource !== null
       ? simulatedSource
@@ -216,6 +221,11 @@ export function AppFlow({
     return () => simulatedSource?.stopContinuousSamples()
   }, [simulatedSource, startSimulationOnMount])
 
+  useEffect(
+    () => simulatedSource?.subscribeContinuousEmission(setSimulatedEmission),
+    [simulatedSource],
+  )
+
   function selectSource(next: 'simulated' | 'bluetooth'): void {
     if (next === selectedSource) return
     void source.disconnect()
@@ -286,6 +296,16 @@ export function AppFlow({
           : null
     if (run === null) throw new Error('Active mission screen requires a run')
     const hintEligibility = getMissionHintEligibility(run)
+    const simulatorOutputProps =
+      selectedSource === 'simulated' &&
+      simulatedSource !== null &&
+      simulatedEmission !== null
+        ? {
+            simulatorOutputBpm: simulatedEmission.bpm,
+            onSimulatorOutputChange: (bpm: number) =>
+              simulatedSource.setContinuousBpm(bpm),
+          }
+        : {}
     screen = (
       <ActiveMissionScreen
         run={run}
@@ -342,6 +362,7 @@ export function AppFlow({
             runGeneration: state.runGeneration,
           })
         }
+        {...simulatorOutputProps}
       />
     )
   } else if (state.lifecycle.phase === 'result') {

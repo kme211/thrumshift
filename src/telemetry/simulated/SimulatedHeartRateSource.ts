@@ -126,8 +126,10 @@ export class SimulatedHeartRateSource implements HeartRateTelemetrySource {
         this.emitError('Simulator received an invalid BPM value')
       return
     }
+    const wasRunning = this.continuousEmission.running
     this.continuousEmission = { ...this.continuousEmission, bpm }
     this.publishEmissionState()
+    if (wasRunning) this.emitSample(bpm)
   }
 
   stopContinuousSamples(): void {

@@ -229,6 +229,27 @@ describe('AppFlow pre-mission and warm-up integration', () => {
     simulatedSource.stopContinuousSamples()
   })
 
+  it('changes the active simulator output through the production preset control', async () => {
+    const user = userEvent.setup()
+    const flow = renderFlow()
+    const setContinuousBpm = vi.spyOn(flow.simulatedSource, 'setContinuousBpm')
+    await enterActiveFlow(flow)
+
+    expect(
+      screen.getByLabelText('Current simulated heart rate'),
+    ).toHaveTextContent('110 BPM')
+    await user.click(screen.getByRole('button', { name: 'High 160 BPM' }))
+
+    expect(setContinuousBpm).toHaveBeenCalledWith(160)
+    expect(flow.simulatedSource.getContinuousEmissionState().bpm).toBe(160)
+    expect(
+      screen.getByLabelText('Current simulated heart rate'),
+    ).toHaveTextContent('160 BPM')
+    expect(
+      screen.getByRole('button', { name: 'High 160 BPM' }),
+    ).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('lets Stop Samples produce normal stale-signal suspension', async () => {
     const { scheduler, setTime, simulatedSource, simulatedTimers } =
       renderFlow()

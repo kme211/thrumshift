@@ -1644,6 +1644,136 @@ button:disabled {
   line-height: 1.45;
 }
 
+.simulator-output {
+  min-width: 0;
+  margin: 0.85rem 0.25rem 0.15rem;
+  padding: 0;
+  border: 1px solid #555748;
+  background: #1b1d18;
+  box-shadow:
+    inset 0 1px rgb(255 255 255 / 0.035),
+    inset 0 -1px rgb(0 0 0 / 0.45);
+}
+
+.simulator-output__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.38rem 0.55rem;
+  background: #34362e;
+  color: #c4c0aa;
+  font-family: var(--font-equipment);
+  font-size: 0.58rem;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.simulator-output__label span:last-child {
+  color: #858675;
+  text-align: right;
+}
+
+.simulator-output__panel {
+  display: grid;
+  grid-template-columns: minmax(4.8rem, 0.28fr) minmax(0, 1fr);
+  gap: 0.65rem;
+  padding: 0.65rem;
+}
+
+.simulator-output__readout {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding-right: 0.65rem;
+  border-right: 1px solid #46483d;
+  font-family: var(--font-instrument);
+}
+
+.simulator-output__readout > span {
+  color: #858675;
+  font-size: 0.56rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.simulator-output__readout output {
+  margin-top: 0.18rem;
+  color: var(--display-amber);
+  font-size: 1.35rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-shadow: 0 0 0.35rem rgb(239 180 94 / 0.16);
+}
+
+.simulator-output__readout small {
+  color: var(--display-amber-dim);
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+}
+
+.simulator-output__presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.simulator-output__presets button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  min-height: 3.1rem;
+  padding: 0.42rem;
+  border-color: #4d4f43;
+  border-bottom-width: 0.18rem;
+  border-radius: 0.12rem;
+  background: #242620;
+  color: #aaa995;
+  font-family: var(--font-equipment);
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.simulator-output__presets button[aria-pressed='true'] {
+  border-color: #747967;
+  background: #2b3027;
+  color: var(--display-green);
+  box-shadow:
+    inset 0 0 0 1px rgb(159 207 141 / 0.08),
+    0 0 0.35rem rgb(159 207 141 / 0.08);
+}
+
+.simulator-output__presets strong,
+.simulator-output__presets small {
+  display: block;
+}
+
+.simulator-output__presets strong {
+  font-size: 0.57rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1.05;
+}
+
+.simulator-output__presets small {
+  margin-top: 0.2rem;
+  color: #858675;
+  font-size: 0.51rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+
+.simulator-output__presets button[aria-pressed='true'] small {
+  color: #a7bb98;
+}
+
 .mission-pause,
 .equipment-button {
   min-width: 10rem;
@@ -2516,6 +2646,28 @@ button:disabled {
 
   .active-mission__instructions {
     margin: 0.7rem 0.35rem 0.15rem;
+  }
+
+  .simulator-output {
+    margin: 0.7rem 0.35rem 0.15rem;
+  }
+
+  .simulator-output__panel {
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+  }
+
+  .simulator-output__readout {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 0 0 0.5rem;
+    border-right: 0;
+    border-bottom: 1px solid #46483d;
+  }
+
+  .simulator-output__readout output {
+    margin-top: 0;
   }
 
   .coolant-board {

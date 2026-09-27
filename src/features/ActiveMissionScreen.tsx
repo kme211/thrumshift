@@ -4,6 +4,7 @@ import type { MissionRun } from '../app/MissionRun'
 import { BioLinkStatus } from '../components/mission/BioLinkStatus'
 import { ControlledCoolantPuzzle } from '../components/mission/CoolantPuzzle'
 import { OperationalRangeGauge } from '../components/mission/OperationalRangeGauge'
+import { SimulatorOutputControl } from '../components/mission/SimulatorOutputControl'
 import { StationStabilityMeter } from '../components/mission/StationStabilityMeter'
 import { getMissionIntervalBehavior } from '../domain/mission/activeMission'
 import type { TelemetrySourceStatus } from '../telemetry/HeartRateTelemetrySource'
@@ -25,6 +26,8 @@ interface ActiveMissionScreenProps {
   readonly onResume: () => void
   readonly onReconnect: () => void
   readonly onEndRun: () => void
+  readonly simulatorOutputBpm?: number
+  readonly onSimulatorOutputChange?: (bpm: number) => void
 }
 
 export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
@@ -165,6 +168,13 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
               Stay in range while restoring coolant flow. Correct low or high
               output, then rotate the route into place.
             </p>
+            {props.simulatorOutputBpm === undefined ||
+            props.onSimulatorOutputChange === undefined ? null : (
+              <SimulatorOutputControl
+                bpm={props.simulatorOutputBpm}
+                onSelect={props.onSimulatorOutputChange}
+              />
+            )}
           </section>
 
           <section

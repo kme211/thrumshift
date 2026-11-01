@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { reactorCoolingEasy } from '../../domain/puzzle/boards/reactorCoolingEasy'
+import { reactorCoolingEasy } from '../../domain/puzzle/legacy/boards/reactorCoolingEasy'
 import {
   createPuzzleState,
   isPuzzleComplete,
@@ -9,9 +9,9 @@ import {
   selectPuzzleHint,
   sourceReachableTileIds,
   tileOpenings,
-} from '../../domain/puzzle/model'
-import type { PuzzleHint } from '../../domain/puzzle/types'
-import type { PuzzleState } from '../../domain/puzzle/types'
+} from '../../domain/puzzle/legacy/model'
+import type { PuzzleHint } from '../../domain/puzzle/legacy/types'
+import type { PuzzleState } from '../../domain/puzzle/legacy/types'
 import { CoolantTile } from './CoolantTile'
 
 interface ControlledCoolantPuzzleProps {

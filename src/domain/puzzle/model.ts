@@ -1,278 +1,292 @@
+import { assertValidDefinition, validPositions } from './definition'
 import {
-  DIRECTIONS,
-  type BoardValidationResult,
-  type Coordinate,
-  type Direction,
-  type Orientation,
-  type PuzzleBoard,
-  type PuzzleHint,
+  type BehavioralObservation,
+  type BehavioralReadings,
+  type CandidateGroup,
+  type DirectedEdge,
+  type FittingId,
+  type ObservationAction,
+  type PlayerSafeView,
+  type PortId,
+  type PublicSchematic,
+  type PuzzleDefinition,
   type PuzzleState,
-  type PuzzleTile,
-  type TileShape,
+  type StructuralDiscovery,
+  type TraceKnowledge,
+  type TracePreview,
+  type ValveId,
+  type ValvePositions,
 } from './types'
 
-const BASE_OPENINGS: Record<TileShape, readonly Direction[]> = {
-  endpoint: ['north'],
-  straight: ['north', 'south'],
-  corner: ['north', 'east'],
+/** Resolves directed edges, never reciprocal openings. No private edges enter state. */
+export function resolveActiveGraph(
+  definition: PuzzleDefinition,
+  positions: ValvePositions,
+): readonly DirectedEdge[] {
+  assertValidDefinition(definition)
+  if (!validPositions(positions)) throw new Error('Invalid valve positions.')
+  return [
+    ...definition.schematic.valves.V1[positions.V1],
+    ...definition.schematic.valves.V2[positions.V2],
+    ...definition.schematic.valves.V3[positions.V3],
+    ...definition.fittings,
+  ].map(({ from, to }) => ({ from, to }))
 }
 
-const DELTAS: Record<Direction, Coordinate> = {
-  north: { row: -1, column: 0 },
-  east: { row: 0, column: 1 },
-  south: { row: 1, column: 0 },
-  west: { row: 0, column: -1 },
-}
-
-export const OPPOSITE_DIRECTION: Record<Direction, Direction> = {
-  north: 'south',
-  east: 'west',
-  south: 'north',
-  west: 'east',
-}
-
-export function rotateDirection(
-  direction: Direction,
-  orientation: Orientation,
-): Direction {
-  return DIRECTIONS[(DIRECTIONS.indexOf(direction) + orientation) % 4]!
-}
-
-export function rotateOrientation(orientation: Orientation): Orientation {
-  return ((orientation + 1) % 4) as Orientation
-}
-
-export function openingsFor(
-  shape: TileShape,
-  orientation: Orientation,
-): readonly Direction[] {
-  return BASE_OPENINGS[shape].map((direction) =>
-    rotateDirection(direction, orientation),
-  )
-}
-
-export function haveEquivalentOpenings(
-  first: readonly Direction[],
-  second: readonly Direction[],
-): boolean {
-  return (
-    first.length === second.length &&
-    first.every((direction) => second.includes(direction))
-  )
-}
-
-export function coordinateKey({ row, column }: Coordinate): string {
-  return `${row}:${column}`
-}
-
-export function isInBounds(
-  board: PuzzleBoard,
-  { row, column }: Coordinate,
-): boolean {
-  return row >= 0 && row < board.rows && column >= 0 && column < board.columns
-}
-
-export function adjacentCoordinate(
-  board: PuzzleBoard,
-  coordinate: Coordinate,
-  direction: Direction,
-): Coordinate | null {
-  const delta = DELTAS[direction]
-  const adjacent = {
-    row: coordinate.row + delta.row,
-    column: coordinate.column + delta.column,
-  }
-  return isInBounds(board, adjacent) ? adjacent : null
-}
-
-export function tileAt(
-  board: PuzzleBoard,
-  coordinate: Coordinate,
-): PuzzleTile | undefined {
-  return board.tiles.find(
-    (tile) => tile.row === coordinate.row && tile.column === coordinate.column,
-  )
-}
-
-export function createPuzzleState(board: PuzzleBoard): PuzzleState {
-  assertValidBoard(board)
-  return {
-    board,
-    orientations: Object.fromEntries(
-      board.tiles.map((tile) => [tile.id, tile.initialOrientation]),
-    ),
-  }
-}
-
-export function createSolvedPuzzleState(board: PuzzleBoard): PuzzleState {
-  assertValidBoard(board)
-  return {
-    board,
-    orientations: Object.fromEntries(
-      board.tiles.map((tile) => [tile.id, tile.solutionOrientation]),
-    ),
-  }
-}
-
-export function resetPuzzle(state: PuzzleState): PuzzleState {
-  return createPuzzleState(state.board)
-}
-
-export function rotateTile(state: PuzzleState, tileId: string): PuzzleState {
-  const orientation = state.orientations[tileId]
-  if (orientation === undefined) return state
-  return {
-    ...state,
-    orientations: {
-      ...state.orientations,
-      [tileId]: rotateOrientation(orientation),
-    },
-  }
-}
-
-export function tileOpenings(
-  state: PuzzleState,
-  tile: PuzzleTile,
-): readonly Direction[] {
-  const orientation = state.orientations[tile.id]
-  if (orientation === undefined)
-    throw new Error(`Missing orientation for tile ${tile.id}.`)
-  return openingsFor(tile.shape, orientation)
-}
-
-export function hasReciprocalConnection(
-  state: PuzzleState,
-  from: PuzzleTile,
-  direction: Direction,
-): boolean {
-  if (!tileOpenings(state, from).includes(direction)) return false
-  const adjacent = adjacentCoordinate(state.board, from, direction)
-  if (adjacent === null) return false
-  const neighbor = tileAt(state.board, adjacent)
-  return (
-    neighbor !== undefined &&
-    tileOpenings(state, neighbor).includes(OPPOSITE_DIRECTION[direction])
-  )
-}
-
-export function sourceReachableTileIds(
-  state: PuzzleState,
-): ReadonlySet<string> {
-  const source = tileAt(state.board, state.board.source)
-  if (source === undefined) return new Set()
-  const visited = new Set<string>()
-  const pending: PuzzleTile[] = [source]
-
+export function sourceReachability(
+  graph: readonly DirectedEdge[],
+): ReadonlySet<PortId> {
+  const visited = new Set<PortId>()
+  const pending: PortId[] = ['S']
   while (pending.length > 0) {
-    const current = pending.shift()
-    if (current === undefined || visited.has(current.id)) continue
-    visited.add(current.id)
-    for (const direction of tileOpenings(state, current)) {
-      if (!hasReciprocalConnection(state, current, direction)) continue
-      const adjacent = adjacentCoordinate(state.board, current, direction)
-      const neighbor =
-        adjacent === null ? undefined : tileAt(state.board, adjacent)
-      if (neighbor !== undefined && !visited.has(neighbor.id))
-        pending.push(neighbor)
+    const port = pending.pop()!
+    if (visited.has(port)) continue
+    visited.add(port)
+    for (const edge of graph) {
+      if (edge.from === port && !visited.has(edge.to)) pending.push(edge.to)
     }
   }
   return visited
 }
 
-export function isPuzzleComplete(state: PuzzleState): boolean {
-  const reactor = tileAt(state.board, state.board.reactor)
-  if (reactor === undefined) return false
-  return sourceReachableTileIds(state).has(reactor.id)
+export function terminalDelivery(
+  reachable: ReadonlySet<PortId>,
+): Pick<BehavioralReadings, 'return' | 'reactor'> {
+  return { return: reachable.has('return'), reactor: reachable.has('reactor') }
 }
 
-export function selectPuzzleHint(state: PuzzleState): PuzzleHint | null {
-  if (isPuzzleComplete(state)) return null
-  const tile = [...state.board.tiles]
-    .sort((a, b) => a.row - b.row || a.column - b.column)
-    .find((candidate) => {
-      const orientation = state.orientations[candidate.id]
-      if (orientation === undefined) return false
-      return !haveEquivalentOpenings(
-        openingsFor(candidate.shape, orientation),
-        openingsFor(candidate.shape, candidate.solutionOrientation),
-      )
-    })
-  return tile === undefined
-    ? null
-    : { tileId: tile.id, row: tile.row, column: tile.column }
+export function observeBehavior(
+  definition: PuzzleDefinition,
+  positions: ValvePositions,
+): BehavioralReadings {
+  const reachable = sourceReachability(
+    resolveActiveGraph(definition, positions),
+  )
+  return {
+    S: reachable.has('S'),
+    X: reachable.has('V2.x'),
+    Y: reachable.has('V2.y'),
+    ...terminalDelivery(reachable),
+  }
 }
 
-export function validateBoard(board: PuzzleBoard): BoardValidationResult {
-  const errors: string[] = []
-  if (!Number.isInteger(board.rows) || board.rows <= 0)
-    errors.push('Rows must be a positive integer.')
-  if (!Number.isInteger(board.columns) || board.columns <= 0)
-    errors.push('Columns must be a positive integer.')
-  if (board.tiles.length !== board.rows * board.columns)
-    errors.push('Board must contain exactly one tile per coordinate.')
-
-  const ids = new Set<string>()
-  const coordinates = new Set<string>()
-  for (const tile of board.tiles) {
-    if (ids.has(tile.id)) errors.push(`Duplicate tile id: ${tile.id}.`)
-    ids.add(tile.id)
-    const key = coordinateKey(tile)
-    if (coordinates.has(key)) errors.push(`Duplicate tile coordinate: ${key}.`)
-    coordinates.add(key)
-    if (!isInBounds(board, tile))
-      errors.push(`Tile ${tile.id} is outside the board.`)
-    if (
-      ![0, 1, 2, 3].includes(tile.initialOrientation) ||
-      ![0, 1, 2, 3].includes(tile.solutionOrientation)
-    )
-      errors.push(`Tile ${tile.id} has an invalid orientation.`)
-  }
-
-  for (let row = 0; row < board.rows; row += 1) {
-    for (let column = 0; column < board.columns; column += 1) {
-      if (!coordinates.has(coordinateKey({ row, column })))
-        errors.push(`Missing tile at ${row}:${column}.`)
-    }
-  }
-
-  const source = tileAt(board, board.source)
-  const reactor = tileAt(board, board.reactor)
-  if (source?.role !== 'source')
-    errors.push('Source coordinate must identify the source tile.')
-  if (reactor?.role !== 'reactor')
-    errors.push('Reactor coordinate must identify the reactor tile.')
-  if (source?.shape !== 'endpoint')
-    errors.push('Source tile must use the endpoint shape.')
-  if (reactor?.shape !== 'endpoint')
-    errors.push('Reactor tile must use the endpoint shape.')
-  if (board.tiles.filter((tile) => tile.role === 'source').length !== 1)
-    errors.push('Board must contain exactly one source.')
-  if (board.tiles.filter((tile) => tile.role === 'reactor').length !== 1)
-    errors.push('Board must contain exactly one reactor.')
-
-  if (errors.length === 0) {
-    const solved = {
-      board,
-      orientations: Object.fromEntries(
-        board.tiles.map((tile) => [tile.id, tile.solutionOrientation]),
-      ),
-    }
-    if (!isPuzzleComplete(solved))
-      errors.push('Declared solution does not connect source to reactor.')
-    for (const tile of board.tiles) {
-      for (const direction of tileOpenings(solved, tile)) {
-        if (!hasReciprocalConnection(solved, tile, direction))
-          errors.push(
-            `Solved tile ${tile.id} has an off-board or one-sided opening.`,
-          )
-      }
-    }
-  }
-  return { valid: errors.length === 0, errors }
+export function isPuzzleComplete(
+  definition: PuzzleDefinition,
+  state: PuzzleState,
+): boolean {
+  return observeBehavior(definition, state.positions).reactor
 }
 
-export function assertValidBoard(board: PuzzleBoard): void {
-  const result = validateBoard(board)
-  if (!result.valid)
-    throw new Error(`Invalid puzzle board: ${result.errors.join(' ')}`)
+function copyPositions(positions: ValvePositions): ValvePositions {
+  return { V1: positions.V1, V2: positions.V2, V3: positions.V3 }
+}
+
+function recordObservation(
+  definition: PuzzleDefinition,
+  positions: ValvePositions,
+  experiment: number,
+  action: ObservationAction,
+): BehavioralObservation {
+  return {
+    experiment,
+    action,
+    positions: copyPositions(positions),
+    readings: observeBehavior(definition, positions),
+  }
+}
+
+export function createPuzzleState(definition: PuzzleDefinition): PuzzleState {
+  assertValidDefinition(definition)
+  const positions = copyPositions(definition.initialPositions)
+  return {
+    positions,
+    observations: [
+      recordObservation(definition, positions, 1, { type: 'INITIAL' }),
+    ],
+    discoveries: [],
+    traceBudget: definition.traceBudget,
+    tracesSpent: 0,
+    adjustments: 0,
+  }
+}
+
+/** Unknown controls/positions and a currently selected position are identity no-ops. */
+export function changeValvePosition(
+  definition: PuzzleDefinition,
+  state: PuzzleState,
+  valve: string,
+  position: string,
+): PuzzleState {
+  assertValidDefinition(definition)
+  if (!Object.hasOwn(definition.schematic.valves, valve)) return state
+  const valveId = valve as ValveId
+  if (
+    !Object.hasOwn(definition.schematic.valves[valveId], position) ||
+    state.positions[valveId] === position
+  )
+    return state
+  const positions = {
+    ...state.positions,
+    [valveId]: position,
+  } as ValvePositions
+  return {
+    ...state,
+    positions,
+    adjustments: state.adjustments + 1,
+    observations: [
+      ...state.observations,
+      recordObservation(definition, positions, state.observations.length + 1, {
+        type: 'VALVE CHANGE',
+        valve: valveId,
+        position,
+      }),
+    ],
+  }
+}
+
+function copyScope(group: CandidateGroup): CandidateGroup {
+  return {
+    fittings: [...group.fittings],
+    first: [...group.first],
+    second: [...group.second],
+  }
+}
+
+/** This API intentionally has no fixture parameter. It cannot rank concealed fittings. */
+export function previewTrace(
+  schematic: PublicSchematic,
+  knowledge: TraceKnowledge,
+  target: string,
+): TracePreview {
+  const group = schematic.candidateGroups.find((candidate) =>
+    candidate.fittings.some((id) => id === target),
+  )
+  if (!group) return { target: null, status: 'invalid', cost: 0, scope: null }
+  const id = target as FittingId
+  const known = knowledge.discoveries.some((discovery) => discovery.id === id)
+  return {
+    target: id,
+    status: known
+      ? 'known'
+      : knowledge.chargesRemaining > 0
+        ? 'available'
+        : 'exhausted',
+    cost: known || knowledge.chargesRemaining <= 0 ? 0 : 1,
+    scope: copyScope(group),
+  }
+}
+
+export function applyTrace(
+  definition: PuzzleDefinition,
+  state: PuzzleState,
+  target: string,
+): PuzzleState {
+  assertValidDefinition(definition)
+  const preview = previewTrace(
+    definition.schematic,
+    {
+      discoveries: state.discoveries,
+      chargesRemaining: state.traceBudget - state.tracesSpent,
+    },
+    target,
+  )
+  if (preview.status !== 'available') return state
+  const fitting = definition.fittings.find(
+    (item) => item.id === preview.target,
+  )!
+  return {
+    ...state,
+    tracesSpent: state.tracesSpent + 1,
+    discoveries: [
+      ...state.discoveries,
+      { id: fitting.id, from: fitting.from, to: fitting.to },
+    ],
+  }
+}
+
+/** Resets routing, retaining every observation, discovery, expenditure and adjustment. */
+export function resetRouting(
+  definition: PuzzleDefinition,
+  state: PuzzleState,
+): PuzzleState {
+  assertValidDefinition(definition)
+  const positions = copyPositions(definition.initialPositions)
+  return {
+    ...state,
+    positions,
+    observations: [
+      ...state.observations,
+      recordObservation(definition, positions, state.observations.length + 1, {
+        type: 'ROUTING RESET',
+      }),
+    ],
+  }
+}
+
+function copyReadings(readings: BehavioralReadings): BehavioralReadings {
+  return {
+    S: readings.S,
+    X: readings.X,
+    Y: readings.Y,
+    return: readings.return,
+    reactor: readings.reactor,
+  }
+}
+
+function copyDiscovery(discovery: StructuralDiscovery): StructuralDiscovery {
+  return { id: discovery.id, from: discovery.from, to: discovery.to }
+}
+
+function copyAction(action: ObservationAction): ObservationAction {
+  return action.type === 'VALVE CHANGE'
+    ? { type: action.type, valve: action.valve, position: action.position }
+    : { type: action.type }
+}
+
+function copySchematic(schematic: PublicSchematic): PublicSchematic {
+  const copyEdges = (edges: readonly DirectedEdge[]) =>
+    edges.map(({ from, to }) => ({ from, to }))
+  return {
+    ports: [...schematic.ports],
+    oneWay: schematic.oneWay,
+    candidateGroups: schematic.candidateGroups.map(copyScope),
+    valves: {
+      V1: {
+        A: copyEdges(schematic.valves.V1.A),
+        B: copyEdges(schematic.valves.V1.B),
+      },
+      V2: {
+        I: copyEdges(schematic.valves.V2.I),
+        II: copyEdges(schematic.valves.V2.II),
+        III: copyEdges(schematic.valves.V2.III),
+      },
+      V3: {
+        u: copyEdges(schematic.valves.V3.u),
+        v: copyEdges(schematic.valves.V3.v),
+      },
+    },
+  }
+}
+
+/** Allowlisted projection: no fixture/state spreads, solver graph or reachability. */
+export function selectPlayerSafeView(
+  definition: PuzzleDefinition,
+  state: PuzzleState,
+): PlayerSafeView {
+  return {
+    schematic: copySchematic(definition.schematic),
+    positions: copyPositions(state.positions),
+    readings: copyReadings(observeBehavior(definition, state.positions)),
+    observations: state.observations.map((observation) => ({
+      experiment: observation.experiment,
+      action: copyAction(observation.action),
+      positions: copyPositions(observation.positions),
+      readings: copyReadings(observation.readings),
+    })),
+    discoveries: state.discoveries.map(copyDiscovery),
+    traceBudget: state.traceBudget,
+    tracesSpent: state.tracesSpent,
+    chargesRemaining: state.traceBudget - state.tracesSpent,
+    adjustments: state.adjustments,
+  }
 }

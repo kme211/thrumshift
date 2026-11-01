@@ -19,7 +19,7 @@ import {
   resetPuzzle,
   rotateTile,
   selectPuzzleHint,
-} from '../domain/puzzle/model'
+} from '../domain/puzzle/legacy/model'
 import { createWarmupState, transitionWarmup } from '../domain/mission/warmup'
 import type { TelemetrySourceStatus } from '../telemetry/HeartRateTelemetrySource'
 import type { AppState } from './AppState'

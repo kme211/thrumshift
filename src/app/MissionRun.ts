@@ -2,9 +2,9 @@ import type {
   ClassifierState,
   TargetRange,
 } from '../domain/heart-rate/classifier'
-import { reactorCoolingEasy } from '../domain/puzzle/boards/reactorCoolingEasy'
-import { createPuzzleState } from '../domain/puzzle/model'
-import type { PuzzleHint, PuzzleState } from '../domain/puzzle/types'
+import { reactorCoolingEasy } from '../domain/puzzle/legacy/boards/reactorCoolingEasy'
+import { createPuzzleState } from '../domain/puzzle/legacy/model'
+import type { PuzzleHint, PuzzleState } from '../domain/puzzle/legacy/types'
 import { createMissionSessionState } from '../domain/mission/missionSession'
 import type { MissionSessionState } from '../domain/mission/missionSession'
 import type { GameplayTuning } from '../config/gameplayTuning'

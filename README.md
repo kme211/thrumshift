@@ -6,7 +6,7 @@ Thrumshift is a browser game in which heart-rate telemetry affects station stabi
 
 ## Requirements
 
-- Node.js 22.12.0 (pinned in `.nvmrc`; `package.json` permits supported releases from 22.12 through 24)
+- Node.js 22.23.4 (pinned in `.nvmrc`; `package.json` supports Node 22.13+ within 22.x, or 24.x)
 - npm 10 or newer
 - Chromium for end-to-end tests
 
@@ -97,7 +97,7 @@ Create a Cloudflare Pages project connected to this repository with these settin
 - Root directory: leave blank
 - Environment variables and secrets: none
 
-The committed `.nvmrc` pins the Pages build image to Node.js 22.12.0. That Pages deployment path requires no Pages Functions, redirect file, or custom build adapter; the Wrangler file above is used by the separate Workers integration. Cloudflare Pages treats a project without a top-level `404.html` as a single-page application and serves `/` for unknown paths, so direct URL reloads reach the application shell.
+The committed `.nvmrc` pins Cloudflare builds to Node.js 22.23.4. That Pages deployment path requires no Pages Functions, redirect file, or custom build adapter; the Wrangler file above is used by the separate Workers integration. Cloudflare Pages treats a project without a top-level `404.html` as a single-page application and serves `/` for unknown paths, so direct URL reloads reach the application shell.
 
 After the first successful deployment, attach a production hostname from the Pages project's **Custom domains** panel. If the hostname is in the same Cloudflare account, Pages can create the DNS record automatically. For DNS hosted elsewhere, associate the hostname in Pages first and then create the requested CNAME to the project's `<project-name>.pages.dev` hostname.
 

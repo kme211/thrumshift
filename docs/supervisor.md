@@ -41,7 +41,7 @@ Read `README.md` for current behavior, `docs/roadmap.md` for planned scope and `
 
 Preserve telemetry filtering/staleness and qualification rules, ordered occurrence-time/sequence facts, suspension/reconnection behavior, active-play timing, deterministic mission results, accessibility/focus and reduced-motion behavior. UI effects must not alter domain timing or reorder facts. The current application is client-only; do not incidentally introduce accounts, a backend, persistence or new telemetry collection. Historical captures under `docs/design/old` are not the approved current visual direction.
 
-`README.md` and `package.json` define the checks. Use the supported Node range (22.12 through 24) and the following commands for application changes, with affected subsets during implementation and the full applicable set before readiness:
+`README.md` and `package.json` define the checks. Use the supported Node versions (22.13+ within 22.x, or 24.x; .nvmrc pins 22.23.4) and the following commands for application changes, with affected subsets during implementation and the full applicable set before readiness:
 
 ```sh
 npm ci

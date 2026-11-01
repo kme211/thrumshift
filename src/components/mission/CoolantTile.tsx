@@ -1,4 +1,4 @@
-import type { Direction, PuzzleTile } from '../../domain/puzzle/types'
+import type { Direction, PuzzleTile } from '../../domain/puzzle/legacy/types'
 
 const DIRECTION_LABEL: Record<Direction, string> = {
   north: 'north',

@@ -40,6 +40,8 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for the tested temporary-HTTPS workflow use
 
 Automated component tests inject telemetry sources at the application boundary rather than mocking domain modules. The reusable telemetry-source contract suite runs against both simulated and Web Bluetooth adapters. Web Bluetooth tests use the narrow injected browser port; automated tests never open a real chooser. The diagnostics panel is removed from production builds, and `npm run build && npm run e2e` verifies that exclusion.
 
+The directed coolant deduction domain and authored fixture live in `src/domain/puzzle`. They model valve experiments and Junction Trace independently of mission timing. Current gameplay and development diagnostics still use the unchanged grid puzzle isolated in `src/domain/puzzle/legacy`; runtime and UI migration are separate stories.
+
 ## Web Bluetooth hardware check
 
 1. Serve the development app from localhost or an HTTPS origin and open it in Android Chrome.

@@ -28,6 +28,21 @@
         "planner": ".codex/agents/supervisor-planner.toml",
         "implementer": ".codex/agents/supervisor-implementer.toml",
         "reviewer": ".codex/agents/supervisor-reviewer.toml"
+      },
+      "planningPreparation": {
+        "role": ".codex/agents/supervisor-narrative-preparer.toml",
+        "inputs": [
+          "AGENTS.md",
+          "docs/supervisor.md",
+          "docs/lore.md",
+          ".agents/skills/thrumshift-narrative/SKILL.md",
+          "docs/narrative/mission-brief.template.md",
+          "docs/narrative/missions/reactor-cooling-failure.md"
+        ],
+        "profiles": {
+          "full": "Use the frozen narrative skill in full mode for exactly the assigned mission/scope. Produce the complete bounded handoff, implementation-ready copy and explicit openItems. For Reactor Cooling Failure, do not finalize the technical observation until approved deduction behavior is concretely bound; a draft dependency cannot be passed to implementation as a meaningful placeholder.",
+          "continuity": "Use the frozen narrative skill in continuity mode. Check affected canon, copy, provenance, character/player knowledge and reveal conditions against the assigned bounded change. Do not create new story scope. Record missing consequential design or a needed full narrative pass in openItems or a precise blocker. Unrelated non-narrative work does not inherit Reactor Cooling Failure's dependency."
+        }
       }
     }
   ]

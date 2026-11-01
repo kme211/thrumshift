@@ -11,3 +11,5 @@ For affected application changes, use the supported Node versions (22.13+ within
 Keep UI changes aligned with the approved current design documents and inspect relevant desktop/mobile, focus/accessibility and reduced-motion behavior. Historical captures in docs/design/old are not the current reference. Resolve routine choices from current code; document contradictions requiring a consequential product decision rather than guessing.
 
 For a host-assigned supervisor role, also read docs/supervisor.md. The host coordinates planning, implementation, independent review and publication in separate sessions. Do not spawn nested orchestration. Never merge, deploy, release, modify secrets/access/billing or perform destructive production work as part of issue implementation.
+
+For story-bearing work, read docs/lore.md and the affected compact mission brief. Use .agents/skills/thrumshift-narrative/SKILL.md when preparing or auditing narrative meaning/continuity. Preparation is an optional capability within DEEP, selected explicitly by the host; it is not another workflow class and must not delay unrelated non-narrative work.

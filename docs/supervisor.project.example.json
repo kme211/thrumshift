@@ -1,0 +1,34 @@
+{
+  "id": "thrumshift",
+  "repository": "kme211/thrumshift",
+  "checkout": "/absolute/path/to/thrumshift",
+  "baseBranch": "main",
+  "enabled": false,
+  "autoPick": false,
+  "labels": ["codex:deep"],
+  "skipLabels": [
+    "codex:skip",
+    "codex:blocked",
+    "blocked",
+    "needs:decision",
+    "needs:review",
+    "needs:spike",
+    "epic"
+  ],
+  "model": "gpt-6-sol",
+  "approval": "auto-review",
+  "instructions": "Read AGENTS.md and docs/supervisor.md. Apply the repository validation and product rules to the assigned issue. The supervisor owns independent phase sessions and durable recovery; no orchestration skill is required. Preserve scope, evidence, validation and independent-review gates.",
+  "workflows": [
+    {
+      "id": "deep",
+      "label": "codex:deep",
+      "mode": "reviewed",
+      "instructions": "Use docs/supervisor.md for this DEEP workflow. Return the host-required grounded phase handoff. There is no qualified LUNA role: planning must select SOL implementation. Do not spawn nested agents or restart orchestration. No merge, deployment, release, secret/access/billing changes or destructive production work.",
+      "roles": {
+        "planner": ".codex/agents/supervisor-planner.toml",
+        "implementer": ".codex/agents/supervisor-implementer.toml",
+        "reviewer": ".codex/agents/supervisor-reviewer.toml"
+      }
+    }
+  ]
+}

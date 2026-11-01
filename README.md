@@ -68,6 +68,22 @@ npm run e2e:puzzle
 
 `npm run e2e:puzzle` opens the same development diagnostics entry used by the app and checks the workbench at phone/tablet sizes, a viewport orientation change, reduced motion, and a 200% zoom approximation. It does not create a second application or harness.
 
+## Cloudflare Workers previews
+
+The connected Workers Builds integration uses `wrangler.jsonc` to serve the existing production `dist` output as static assets. It has no Worker entry point, backend bindings, environment variables, or secrets. SPA fallback serves the application shell on direct URL reloads.
+
+Workers Builds should run `npm run build` before its Preview command, `npx wrangler preview`. The committed empty `previews` block is required for that command; this static app needs no separate Preview bindings. The configuration and local checks below are validated with Wrangler 4.156.0; use that version or newer so the local runtime supports the committed compatibility date.
+
+After building, validate the static-assets configuration and deployment bundle without uploading or deploying:
+
+```sh
+npx wrangler deploy --dry-run
+```
+
+`wrangler preview` has no dry-run flag. The deployment dry run validates local packaging; it does not create a Preview or prove that a remote build succeeded. The PR's actual Workers Builds check must pass. `wrangler preview` creates or updates the branch Preview, while `wrangler deploy` without `--dry-run` deploys production. Do not substitute a production deploy command to repair a branch Preview failure.
+
+See [Cloudflare Preview configuration](https://developers.cloudflare.com/workers/previews/configuration/) for the empty-block and top-level static-assets settings. The Pages setup below remains an alternative for a Pages project.
+
 ## Cloudflare Pages deployment
 
 `npm run build` produces the production site in `dist`. Before creating a release, run the quality commands above from a clean `npm ci` installation.
@@ -81,7 +97,7 @@ Create a Cloudflare Pages project connected to this repository with these settin
 - Root directory: leave blank
 - Environment variables and secrets: none
 
-The committed `.nvmrc` pins the Pages build image to Node.js 22.12.0. No Pages Functions, Wrangler configuration, redirect file, or custom build adapter is required. Cloudflare Pages treats a project without a top-level `404.html` as a single-page application and serves `/` for unknown paths, so direct URL reloads reach the application shell.
+The committed `.nvmrc` pins the Pages build image to Node.js 22.12.0. That Pages deployment path requires no Pages Functions, redirect file, or custom build adapter; the Wrangler file above is used by the separate Workers integration. Cloudflare Pages treats a project without a top-level `404.html` as a single-page application and serves `/` for unknown paths, so direct URL reloads reach the application shell.
 
 After the first successful deployment, attach a production hostname from the Pages project's **Custom domains** panel. If the hostname is in the same Cloudflare account, Pages can create the DNS record automatically. For DNS hosted elsewhere, associate the hostname in Pages first and then create the requested CNAME to the project's `<project-name>.pages.dev` hostname.
 

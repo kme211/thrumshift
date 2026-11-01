@@ -23,8 +23,8 @@ const RUN_SCOPED_FACT_TYPES = new Set([
   'timeAdvanced',
   'backToBriefing',
   'runAgain',
-  'puzzleTileRotated',
-  'puzzleHintRequested',
+  'puzzleValveChanged',
+  'puzzleTraceRequested',
   'puzzleReset',
   'manualPause',
   'manualResume',
@@ -100,15 +100,18 @@ function finishSuccessfulMission(
   startTime = 16_100,
 ): MissionFlowState {
   let state = initial
-  for (const [index, tileId] of [
-    'top-straight',
-    'middle-corner-left',
-    'bottom-straight',
-  ].entries()) {
+  for (const [index, [valve, position]] of (
+    [
+      ['V1', 'B'],
+      ['V2', 'II'],
+      ['V3', 'v'],
+    ] as const
+  ).entries()) {
     state = apply(state, {
-      type: 'puzzleTileRotated',
+      type: 'puzzleValveChanged',
       occurredAt: startTime + index * 100,
-      tileId,
+      valve,
+      position,
     })
   }
   return state
@@ -374,15 +377,18 @@ describe('mission flow controller', () => {
     )
 
     state = apply(state, {
-      type: 'puzzleTileRotated',
+      type: 'puzzleValveChanged',
       occurredAt: 16_100,
-      tileId: 'top-straight',
+      valve: 'V1',
+      position: 'B',
     })
     expect(state.lifecycle.phase).toBe('activeMission')
     if (state.lifecycle.phase !== 'activeMission') return
     expect(state.lifecycle.mission).not.toBe(originalRun)
-    expect(state.lifecycle.mission.session.statistics.puzzleMoveCount).toBe(1)
-    expect(state.lifecycle.mission.puzzle.orientations['top-straight']).toBe(1)
+    expect(
+      state.lifecycle.mission.session.statistics.valveAdjustmentCount,
+    ).toBe(1)
+    expect(state.lifecycle.mission.puzzle.positions.V1).toBe('B')
   })
 
   it('freezes canonical active time and puzzle input during manual pause, then resumes retained state', () => {
@@ -396,12 +402,13 @@ describe('mission flow controller', () => {
       return
     const pausedRun = state.lifecycle.resumeTarget.mission
     const pausedElapsed = pausedRun.session.mission.activeElapsedTimeMs
-    const orientation = pausedRun.puzzle.orientations['top-straight']
+    const orientation = pausedRun.puzzle.positions.V1
 
     state = apply(state, {
-      type: 'puzzleTileRotated',
+      type: 'puzzleValveChanged',
       occurredAt: 20_000,
-      tileId: 'top-straight',
+      valve: 'V1',
+      position: 'B',
     })
     state = apply(state, {
       type: 'timeAdvanced',
@@ -413,9 +420,9 @@ describe('mission flow controller', () => {
       state.lifecycle.resumeTarget.phase !== 'activeMission'
     )
       return
-    expect(
-      state.lifecycle.resumeTarget.mission.puzzle.orientations['top-straight'],
-    ).toBe(orientation)
+    expect(state.lifecycle.resumeTarget.mission.puzzle.positions.V1).toBe(
+      orientation,
+    )
     expect(
       state.lifecycle.resumeTarget.mission.session.mission.activeElapsedTimeMs,
     ).toBe(pausedElapsed)
@@ -438,32 +445,36 @@ describe('mission flow controller', () => {
       advance(16_000),
     ])
     state = apply(state, {
-      type: 'puzzleTileRotated',
+      type: 'puzzleValveChanged',
       occurredAt: 16_100,
-      tileId: 'top-straight',
+      valve: 'V1',
+      position: 'B',
     })
     state = apply(state, { type: 'puzzleReset', occurredAt: 16_200 })
     state = apply(state, {
-      type: 'puzzleTileRotated',
+      type: 'puzzleValveChanged',
       occurredAt: 16_300,
-      tileId: 'top-straight',
+      valve: 'V1',
+      position: 'B',
     })
     state = apply(state, {
-      type: 'puzzleTileRotated',
+      type: 'puzzleValveChanged',
       occurredAt: 16_400,
-      tileId: 'middle-corner-left',
+      valve: 'V2',
+      position: 'II',
     })
     state = apply(state, {
-      type: 'puzzleTileRotated',
+      type: 'puzzleValveChanged',
       occurredAt: 16_500,
-      tileId: 'bottom-straight',
+      valve: 'V3',
+      position: 'v',
     })
 
     expect(state.lifecycle.phase).toBe('result')
     if (state.lifecycle.phase !== 'result') return
     expect(state.lifecycle.result).toMatchObject({
       outcome: 'success',
-      puzzleMoveCount: 4,
+      valveAdjustmentCount: 4,
       puzzleCompleted: true,
     })
     const finalized = state.lifecycle
@@ -487,20 +498,22 @@ describe('mission flow controller', () => {
     )
     expect(state.lifecycle.mission.session.mission.stability).toBe(1)
     state = apply(state, {
-      type: 'puzzleTileRotated',
+      type: 'puzzleValveChanged',
       occurredAt: 55_000,
-      tileId: 'top-straight',
+      valve: 'V1',
+      position: 'B',
     })
     expect(state.lifecycle.phase).toBe('result')
     if (state.lifecycle.phase !== 'result') return
     expect(state.lifecycle.result.outcome).toBe('failure')
     expect(state.lifecycle.result.endingStability).toBe(0)
-    expect(state.lifecycle.result.puzzleMoveCount).toBe(0)
+    expect(state.lifecycle.result.valveAdjustmentCount).toBe(0)
     const result = state.lifecycle.result
     state = apply(state, {
-      type: 'puzzleTileRotated',
+      type: 'puzzleValveChanged',
       occurredAt: 81_000,
-      tileId: 'top-straight',
+      valve: 'V1',
+      position: 'B',
     })
     if (state.lifecycle.phase === 'result')
       expect(state.lifecycle.result).toBe(result)
@@ -660,7 +673,7 @@ describe('mission flow controller', () => {
     expect(state.lifecycle.warmup.classifier.lastProcessedTimeMs).toBe(50_000)
   })
 
-  it('rejects delayed puzzle, hint, reset, pause, and resume callbacks from an earlier run', () => {
+  it('rejects delayed valve, trace, reset, pause, and resume callbacks from an earlier run', () => {
     const staleGeneration = 1
     let state = finishSuccessfulMission(enterActiveMission(true))
     state = apply(state, { type: 'runAgain', occurredAt: 20_000 })
@@ -669,13 +682,15 @@ describe('mission flow controller', () => {
 
     const staleActiveFacts = [
       {
-        type: 'puzzleTileRotated',
+        type: 'puzzleValveChanged',
         occurredAt: 116_100,
-        tileId: 'top-straight',
+        valve: 'V1',
+        position: 'B',
         runGeneration: staleGeneration,
       },
       {
-        type: 'puzzleHintRequested',
+        type: 'puzzleTraceRequested',
+        target: 'A',
         occurredAt: 116_200,
         runGeneration: staleGeneration,
       },
@@ -731,25 +746,27 @@ describe('mission flow controller', () => {
     })
   })
 
-  it('accepts equivalent current-run puzzle, hint, reset, pause, and resume callbacks', () => {
+  it('accepts equivalent current-run valve, trace, reset, pause, and resume callbacks', () => {
     let state = finishSuccessfulMission()
     state = apply(state, { type: 'runAgain', occurredAt: 20_000 })
     state = enterReplayedActiveMission(state)
-    const initialOrientation =
-      retainedMission(state).puzzle.orientations['top-straight']
+    const initialOrientation = retainedMission(state).puzzle.positions.V1
 
     state = apply(state, {
-      type: 'puzzleTileRotated',
+      type: 'puzzleValveChanged',
       occurredAt: 116_100,
-      tileId: 'top-straight',
+      valve: 'V1',
+      position: 'B',
     })
-    expect(retainedMission(state).session.statistics.puzzleMoveCount).toBe(1)
+    expect(retainedMission(state).session.statistics.valveAdjustmentCount).toBe(
+      1,
+    )
 
     state = apply(state, { type: 'puzzleReset', occurredAt: 116_200 })
-    expect(retainedMission(state).puzzle.orientations['top-straight']).toBe(
-      initialOrientation,
+    expect(retainedMission(state).puzzle.positions.V1).toBe(initialOrientation)
+    expect(retainedMission(state).session.statistics.valveAdjustmentCount).toBe(
+      1,
     )
-    expect(retainedMission(state).session.statistics.puzzleMoveCount).toBe(1)
 
     let hintState = activeMissionWithFreshSamples(110, 18_000)
     hintState = apply(hintState, {
@@ -765,10 +782,11 @@ describe('mission flow controller', () => {
       hintState = apply(hintState, sample(time, 110))
     }
     hintState = apply(hintState, {
-      type: 'puzzleHintRequested',
+      type: 'puzzleTraceRequested',
+      target: 'A',
       occurredAt: 40_000,
     })
-    expect(retainedMission(hintState).hint).not.toBeNull()
+    expect(retainedMission(hintState).puzzle.discoveries).toHaveLength(1)
 
     for (let time = 117_000; time <= 130_000; time += 1_000) {
       state = apply(state, sample(time, 110))
@@ -942,9 +960,10 @@ describe('mission flow controller', () => {
   it('advances signal authority before a rotation and freezes timing and stability at the exact stale deadline', () => {
     let state = activeMissionWithFreshSamples(170)
     state = apply(state, {
-      type: 'puzzleTileRotated',
+      type: 'puzzleValveChanged',
       occurredAt: 26_000,
-      tileId: 'top-straight',
+      valve: 'V1',
+      position: 'B',
     })
 
     expect(state.lifecycle.phase).toBe('suspended')
@@ -965,15 +984,16 @@ describe('mission flow controller', () => {
       behavior: 'suspended',
       startedAtTimeMs: 25_000,
     })
-    expect(run.session.statistics.puzzleMoveCount).toBe(0)
+    expect(run.session.statistics.valveAdjustmentCount).toBe(0)
   })
 
   it('orders stale authority before equal-time puzzle facts', () => {
     let state = activeMissionWithFreshSamples(170)
     state = apply(state, {
-      type: 'puzzleTileRotated',
+      type: 'puzzleValveChanged',
       occurredAt: 25_000,
-      tileId: 'top-straight',
+      valve: 'V1',
+      position: 'B',
     })
 
     expect(state.lifecycle.phase).toBe('suspended')
@@ -988,27 +1008,28 @@ describe('mission flow controller', () => {
       behavior: 'suspended',
       startedAtTimeMs: 25_000,
     })
-    expect(run.session.statistics.puzzleMoveCount).toBe(0)
+    expect(run.session.statistics.valveAdjustmentCount).toBe(0)
   })
 
   it('cannot complete the puzzle after the earlier stale suspension', () => {
     let state = activeMissionWithFreshSamples(170)
-    for (const [occurredAt, tileId] of [
-      [26_000, 'top-straight'],
-      [27_000, 'middle-corner-left'],
-      [28_000, 'bottom-straight'],
+    for (const [occurredAt, valve, position] of [
+      [26_000, 'V1', 'B'],
+      [27_000, 'V2', 'II'],
+      [28_000, 'V3', 'v'],
     ] as const) {
       state = apply(state, {
-        type: 'puzzleTileRotated',
+        type: 'puzzleValveChanged',
         occurredAt,
-        tileId,
+        valve,
+        position,
       })
     }
 
     expect(state.lifecycle.phase).toBe('suspended')
     const run = retainedMission(state)
     expect(run.session.result).toBeNull()
-    expect(run.session.statistics.puzzleMoveCount).toBe(0)
+    expect(run.session.statistics.valveAdjustmentCount).toBe(0)
     expect(run.session.statistics.puzzleCompleted).toBe(false)
     expect(run.session.mission).toMatchObject({
       activeElapsedTimeMs: 4_000,
@@ -1016,11 +1037,12 @@ describe('mission flow controller', () => {
     })
   })
 
-  it('orders a hint request after stale authority while retaining Gate 8A interaction policy', () => {
+  it('orders a trace request after stale authority while retaining Gate 8A interaction policy', () => {
     let state = activeMissionWithFreshSamples(110, 30_000)
     const priorGlobalAnnouncement = state.announcement
     state = apply(state, {
-      type: 'puzzleHintRequested',
+      type: 'puzzleTraceRequested',
+      target: 'A',
       occurredAt: 34_000,
     })
 
@@ -1033,8 +1055,8 @@ describe('mission flow controller', () => {
       behavior: 'suspended',
       startedAtTimeMs: 33_000,
     })
-    expect(run.session.statistics.hintUsed).toBe(false)
-    expect(run.hint).toBeNull()
+    expect(run.session.statistics.junctionTraceCount).toBe(0)
+    expect(run.puzzle.discoveries).toEqual([])
     expect(state.announcement).not.toBe(priorGlobalAnnouncement)
   })
 
@@ -1143,8 +1165,8 @@ describe('mission flow controller', () => {
     expect(retainedMission(state).session.mission.stability).toBe(100)
     expect(retainedMission(state).puzzle).toBe(retainedPuzzle)
     expect(retainedMission(state).session.statistics).toMatchObject({
-      puzzleMoveCount: retainedStatistics.puzzleMoveCount,
-      hintUsed: retainedStatistics.hintUsed,
+      valveAdjustmentCount: retainedStatistics.valveAdjustmentCount,
+      junctionTraceCount: retainedStatistics.junctionTraceCount,
       pauseCount: 1,
     })
 
@@ -1232,34 +1254,39 @@ describe('mission flow controller', () => {
     })
   })
 
-  it('uses authoritative unsuspended active time for deterministic hint eligibility and preserves hint use across reset', () => {
-    let state = activeMissionWithFreshSamples(110, 18_000)
-    state = apply(state, { type: 'manualPause', occurredAt: 19_000 })
-    state = rebuildSignal(state, 20_000)
-    state = apply(state, { type: 'manualResume', occurredAt: 25_500 })
-    for (let time = 26_000; time <= 40_000; time += 1_000) {
-      state = apply(state, sample(time, 110))
-    }
-    expect(state.lifecycle.phase).toBe('activeMission')
-    if (state.lifecycle.phase !== 'activeMission') return
-    expect(
-      state.lifecycle.mission.session.mission.activeElapsedTimeMs,
-    ).toBeGreaterThanOrEqual(10_000)
-
-    state = apply(state, { type: 'puzzleHintRequested', occurredAt: 40_000 })
-    expect(state.lifecycle.phase).toBe('activeMission')
-    if (state.lifecycle.phase !== 'activeMission') return
-    expect(state.lifecycle.mission.hint).toMatchObject({
-      tileId: 'top-straight',
-      row: 0,
-      column: 1,
+  it('allows immediate tracing and retains expenditure, discoveries, history and mission time across reset', () => {
+    let state = enterActiveMission()
+    state = apply(state, {
+      type: 'puzzleTraceRequested',
+      target: 'A',
+      occurredAt: 16_100,
     })
-    expect(state.lifecycle.mission.session.statistics.hintUsed).toBe(true)
-
-    state = apply(state, { type: 'puzzleReset', occurredAt: 40_000 })
-    if (state.lifecycle.phase !== 'activeMission') return
-    expect(state.lifecycle.mission.hint).toBeNull()
-    expect(state.lifecycle.mission.session.statistics.hintUsed).toBe(true)
+    state = apply(state, {
+      type: 'puzzleValveChanged',
+      valve: 'V1',
+      position: 'B',
+      occurredAt: 16_200,
+    })
+    const before = retainedMission(state)
+    state = apply(state, { type: 'puzzleReset', occurredAt: 16_200 })
+    const after = retainedMission(state)
+    expect(after.puzzle).toMatchObject({
+      positions: { V1: 'A', V2: 'I', V3: 'u' },
+      tracesSpent: 1,
+      adjustments: 1,
+    })
+    expect(after.puzzle.discoveries).toEqual(before.puzzle.discoveries)
+    expect(after.puzzle.observations.slice(0, -1)).toEqual(
+      before.puzzle.observations,
+    )
+    expect(after.puzzle.observations.at(-1)?.action.type).toBe('ROUTING RESET')
+    expect(after.session.mission.activeElapsedTimeMs).toBe(
+      before.session.mission.activeElapsedTimeMs,
+    )
+    expect(after.session.statistics).toMatchObject({
+      valveAdjustmentCount: 1,
+      junctionTraceCount: 1,
+    })
   })
 
   it('ignores stale scheduler completion from an earlier run generation', () => {
@@ -1805,4 +1832,262 @@ describe('mission flow controller', () => {
       expect(state.announcement).toBe('Retryable problem')
     }
   })
+})
+
+describe('deduction gameplay acceptance', () => {
+  const valve = (
+    time: number,
+    valve = 'V1',
+    position = 'B',
+  ): Extract<TestFact, { type: 'puzzleValveChanged' }> => ({
+    type: 'puzzleValveChanged',
+    occurredAt: time,
+    valve,
+    position,
+  })
+  const trace = (
+    time: number,
+    target = 'A',
+  ): Extract<TestFact, { type: 'puzzleTraceRequested' }> => ({
+    type: 'puzzleTraceRequested',
+    occurredAt: time,
+    target,
+  })
+
+  function expectPuzzleCounters(state: MissionFlowState) {
+    const run = retainedMission(state)
+    expect(run.session.statistics.valveAdjustmentCount).toBe(
+      run.puzzle.adjustments,
+    )
+    expect(run.session.statistics.junctionTraceCount).toBe(
+      run.puzzle.tracesSpent,
+    )
+  }
+
+  it('counts only real valve adjustments and successful, previously unknown traces', () => {
+    let state = enterActiveMission()
+    const initialPuzzle = retainedMission(state).puzzle
+    for (const fact of [
+      valve(16_100, 'V1', 'A'),
+      valve(16_100, 'missing'),
+      valve(16_100, 'V2', 'invalid'),
+      trace(16_100, 'invalid'),
+    ]) {
+      state = apply(state, fact)
+      expect(retainedMission(state).puzzle).toBe(initialPuzzle)
+      expectPuzzleCounters(state)
+    }
+    state = apply(state, valve(16_100))
+    state = apply(state, trace(16_200))
+    expect(retainedMission(state).puzzle).toMatchObject({
+      adjustments: 1,
+      tracesSpent: 1,
+      discoveries: [{ id: 'A' }],
+    })
+    const afterTrace = retainedMission(state).puzzle
+    state = apply(state, trace(16_200))
+    expect(retainedMission(state).puzzle).toBe(afterTrace)
+    state = apply(state, trace(16_200, 'B'))
+    const exhausted = retainedMission(state).puzzle
+    for (const target of ['A', 'B', 'C', 'D', 'invalid']) {
+      state = apply(state, trace(16_300, target))
+      expect(retainedMission(state).puzzle).toBe(exhausted)
+      expectPuzzleCounters(state)
+    }
+    expect(exhausted.tracesSpent).toBe(2)
+  })
+
+  it.each(['valve', 'trace', 'reset'] as const)(
+    'rejects duplicate, late, obsolete and suspended %s callbacks without changing the complete puzzle or counters',
+    (action) => {
+      let state = enterActiveMission()
+      const fact =
+        action === 'valve'
+          ? valve(16_100)
+          : action === 'trace'
+            ? trace(16_100)
+            : ({ type: 'puzzleReset', occurredAt: 16_100 } as const)
+      state = apply(state, fact)
+      const accepted = retainedMission(state)
+      const snapshot = structuredClone(accepted.puzzle)
+      for (const [rejected, sequence] of [
+        [fact, state.lastAppliedSequence],
+        [{ ...fact, occurredAt: 16_099 }, state.lastAppliedSequence + 1],
+        [{ ...fact, runGeneration: 0 }, state.lastAppliedSequence + 2],
+      ] as const) {
+        state = apply(state, rejected, sequence)
+        expect(retainedMission(state)).toBe(accepted)
+        expect(retainedMission(state).puzzle).toEqual(snapshot)
+        expectPuzzleCounters(state)
+      }
+      state = apply(state, { type: 'manualPause', occurredAt: 16_200 })
+      const suspended = retainedMission(state)
+      state = apply(state, { ...fact, occurredAt: 16_300 })
+      expect(retainedMission(state)).toBe(suspended)
+      expect(retainedMission(state).puzzle).toEqual(snapshot)
+      expectPuzzleCounters(state)
+    },
+  )
+
+  it.each([25_000, 26_000])(
+    'stale trace at %s spends nothing and retains observations and knowledge',
+    (time) => {
+      let state = activeMissionWithFreshSamples(170)
+      const puzzle = retainedMission(state).puzzle
+      state = apply(state, trace(time))
+      expect(state.lifecycle.phase).toBe('suspended')
+      expect(retainedMission(state).puzzle).toBe(puzzle)
+      expectPuzzleCounters(state)
+    },
+  )
+
+  function nearFailure() {
+    let state = activeMissionWithFreshSamples(170)
+    state = apply(state, valve(22_000))
+    state = apply(state, valve(22_000, 'V2', 'II'))
+    if (state.lifecycle.phase !== 'activeMission')
+      throw new Error('Expected active mission')
+    const run = state.lifecycle.mission
+    const mission = run.session.mission
+    return {
+      ...state,
+      lifecycle: {
+        ...state.lifecycle,
+        mission: {
+          ...run,
+          session: {
+            ...run.session,
+            mission: {
+              ...mission,
+              stability: 3,
+              stabilitySegmentAnchor: {
+                startedAtTimeMs: 22_000,
+                stability: 3,
+                activeElapsedTimeMs: mission.activeElapsedTimeMs,
+              },
+            },
+          },
+        },
+      },
+    } satisfies MissionFlowState
+  }
+
+  it('derives success before failure, includes the final adjustment and ignores later callbacks', () => {
+    let state: MissionFlowState = nearFailure()
+    state = apply(state, valve(22_999, 'V3', 'v'))
+    expect(state.lifecycle.phase).toBe('result')
+    if (state.lifecycle.phase !== 'result') return
+    expect(state.lifecycle.result).toMatchObject({
+      outcome: 'success',
+      valveAdjustmentCount: 3,
+      junctionTraceCount: 0,
+      puzzleCompleted: true,
+      finalizedAtTimeMs: 22_999,
+    })
+    const result = state.lifecycle.result
+    for (const fact of [
+      trace(23_000),
+      valve(23_000),
+      { type: 'puzzleReset', occurredAt: 23_000 } as const,
+    ]) {
+      state = apply(state, fact)
+      expect(state.lifecycle.phase === 'result' && state.lifecycle.result).toBe(
+        result,
+      )
+    }
+  })
+
+  it.each(['valve', 'trace', 'reset'] as const)(
+    'exact zero failure preempts derived completion and consumes no %s change',
+    (action) => {
+      let state: MissionFlowState = nearFailure()
+      const run = retainedMission(state)
+      const snapshot = structuredClone(run.puzzle)
+      const fact =
+        action === 'valve'
+          ? valve(23_000, 'V3', 'v')
+          : action === 'trace'
+            ? trace(23_000)
+            : ({ type: 'puzzleReset', occurredAt: 23_000 } as const)
+      state = apply(state, fact)
+      expect(state.lifecycle.phase).toBe('result')
+      if (state.lifecycle.phase !== 'result') return
+      expect(state.lifecycle.result).toMatchObject({
+        outcome: 'failure',
+        finalizedAtTimeMs: 23_000,
+        valveAdjustmentCount: 2,
+        junctionTraceCount: 0,
+        puzzleCompleted: false,
+      })
+      expect(run.puzzle).toEqual(snapshot)
+      const result = state.lifecycle.result
+      state = apply(state, valve(23_000, 'V3', 'v'))
+      state = apply(state, trace(23_000))
+      expect(state.lifecycle.phase === 'result' && state.lifecycle.result).toBe(
+        result,
+      )
+    },
+  )
+
+  it.each(['valve', 'trace'] as const)(
+    'failure strictly before a %s input preempts its expenditure',
+    (action) => {
+      let state: MissionFlowState = nearFailure()
+      state = apply(
+        state,
+        action === 'valve' ? valve(23_001, 'V3', 'v') : trace(23_001),
+      )
+      expect(
+        state.lifecycle.phase === 'result' && state.lifecycle.result,
+      ).toMatchObject({
+        outcome: 'failure',
+        finalizedAtTimeMs: 23_000,
+        valveAdjustmentCount: 2,
+        junctionTraceCount: 0,
+      })
+    },
+  )
+
+  it('orders equal-time external facts before derived completion and retains lower-sequence failure', () => {
+    let state: MissionFlowState = nearFailure()
+    state = apply(state, { type: 'timeAdvanced', occurredAt: 23_000 })
+    state = apply(state, valve(23_000, 'V3', 'v'))
+    expect(
+      state.lifecycle.phase === 'result' && state.lifecycle.result,
+    ).toMatchObject({
+      outcome: 'failure',
+      valveAdjustmentCount: 2,
+      puzzleCompleted: false,
+    })
+  })
+
+  it.each(['success', 'failure'] as const)(
+    'replays %s with fresh knowledge, charges, history and statistics',
+    (outcome) => {
+      let state = apply(enterActiveMission(), trace(16_100))
+      state = apply(state, valve(16_100))
+      const oldGeneration = state.runGeneration
+      state =
+        outcome === 'success'
+          ? finishSuccessfulMission(state)
+          : finishFailedMission(state)
+      expect(state.lifecycle.phase).toBe('result')
+      state = apply(state, { type: 'runAgain', occurredAt: 60_000 })
+      state = enterReplayedActiveMission(state)
+      expect(state.runGeneration).toBeGreaterThan(oldGeneration)
+      expect(retainedMission(state).puzzle).toMatchObject({
+        positions: { V1: 'A', V2: 'I', V3: 'u' },
+        discoveries: [],
+        traceBudget: 2,
+        tracesSpent: 0,
+        adjustments: 0,
+        observations: [{ experiment: 1, action: { type: 'INITIAL' } }],
+      })
+      const fresh = retainedMission(state)
+      state = apply(state, { ...trace(116_100), runGeneration: oldGeneration })
+      state = apply(state, { ...valve(116_100), runGeneration: oldGeneration })
+      expect(retainedMission(state)).toBe(fresh)
+      expectPuzzleCounters(state)
+    },
+  )
 })

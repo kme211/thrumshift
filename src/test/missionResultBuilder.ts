@@ -34,8 +34,8 @@ export function buildMissionResult(
     pauseCount: 2,
     disconnectCount: 1,
     disconnectedDurationMs: 2_000,
-    puzzleMoveCount: 8,
-    hintUsed: true,
+    valveAdjustmentCount: 8,
+    junctionTraceCount: 1,
     puzzleCompleted: true,
     ...overrides,
   })

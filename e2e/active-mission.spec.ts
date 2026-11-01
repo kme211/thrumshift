@@ -28,49 +28,60 @@ async function enterActiveMission(page: import('@playwright/test').Page) {
   ).toBeVisible()
 }
 
-async function assertTilesInsideViewport(
+async function assertControlsInsideViewport(
   page: import('@playwright/test').Page,
 ) {
-  const result = await page.locator('.coolant-tile').evaluateAll((tiles) => ({
-    viewportWidth: document.documentElement.clientWidth,
-    bounds: tiles.map((tile) => {
-      const rect = tile.getBoundingClientRect()
-      return { left: rect.left, right: rect.right, width: rect.width }
+  const controls = page
+    .getByRole('region', { name: 'Coolant deduction puzzle' })
+    .locator('select, button')
+  const bounds = await controls.evaluateAll((elements) =>
+    elements.map((element) => {
+      const rect = element.getBoundingClientRect()
+      return {
+        left: rect.left,
+        right: rect.right,
+        width: rect.width,
+        height: rect.height,
+        viewport: document.documentElement.clientWidth,
+      }
     }),
-  }))
-  expect(result.bounds).toHaveLength(9)
-  for (const bounds of result.bounds) {
-    expect(bounds.left).toBeGreaterThanOrEqual(0)
-    expect(bounds.right).toBeLessThanOrEqual(result.viewportWidth)
-    expect(bounds.width).toBeGreaterThanOrEqual(48)
+  )
+  expect(bounds).toHaveLength(6)
+  for (const control of bounds) {
+    expect(control.left).toBeGreaterThanOrEqual(0)
+    expect(control.right).toBeLessThanOrEqual(control.viewport)
+    expect(control.width).toBeGreaterThanOrEqual(44)
+    expect(control.height).toBeGreaterThanOrEqual(44)
   }
 }
 
-async function rotateAndCheckFocusedEdgeTile(
+async function changeValveWithVisibleFocus(
   page: import('@playwright/test').Page,
 ) {
-  const edgeTile = page.locator('.coolant-tile[aria-label^="Row 1, column 1,"]')
-  await expect(edgeTile).toHaveCount(1)
-  await edgeTile.focus()
-  await edgeTile.press('Enter')
-  await expect(edgeTile).toBeFocused()
-  const focus = await edgeTile.evaluate((tile) => {
-    const rect = tile.getBoundingClientRect()
-    const style = getComputedStyle(tile)
+  const control = page.getByLabel('V1 position')
+  await control.focus()
+  await control.press('Space')
+  await control.press('b')
+  await control.press('Enter')
+  await expect(control).toHaveValue('B')
+  await expect(control).toBeFocused()
+  const focus = await control.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    const style = getComputedStyle(element)
     return {
       left: rect.left,
       right: rect.right,
-      viewportWidth: document.documentElement.clientWidth,
+      viewport: document.documentElement.clientWidth,
       outlineStyle: style.outlineStyle,
-      outlineWidth: Number.parseFloat(style.outlineWidth),
-      outlineOffset: Number.parseFloat(style.outlineOffset),
+      width: Number.parseFloat(style.outlineWidth),
+      offset: Number.parseFloat(style.outlineOffset),
     }
   })
-  const focusExtent = focus.outlineWidth + focus.outlineOffset
+  const extent = focus.width + focus.offset
   expect(focus.outlineStyle).not.toBe('none')
-  expect(focus.outlineWidth).toBeGreaterThan(0)
-  expect(focus.left).toBeGreaterThanOrEqual(focusExtent)
-  expect(focus.right + focusExtent).toBeLessThanOrEqual(focus.viewportWidth)
+  expect(focus.width).toBeGreaterThan(0)
+  expect(focus.left).toBeGreaterThanOrEqual(extent)
+  expect(focus.right + extent).toBeLessThanOrEqual(focus.viewport)
 }
 
 test('simulator presets feed the normal active-mission telemetry path', async ({
@@ -79,10 +90,8 @@ test('simulator presets feed the normal active-mission telemetry path', async ({
   await enterActiveMission(page)
   const inRange = page.getByRole('button', { name: 'In range 110 BPM' })
   const high = page.getByRole('button', { name: 'High 160 BPM' })
-
   await expect(inRange).toHaveAttribute('aria-pressed', 'true')
   await high.click()
-
   await expect(page.getByLabel('Current simulated heart rate')).toHaveText(
     /160\s+BPM/,
   )
@@ -96,141 +105,143 @@ test('simulator presets feed the normal active-mission telemetry path', async ({
 
 for (const viewport of [
   { name: 'narrow phone portrait', width: 360, height: 640 },
+  { name: 'reference phone', width: 390, height: 844 },
   { name: 'larger phone or tablet', width: 768, height: 1024 },
 ]) {
-  test(`puzzle fits ${viewport.name} without overflow`, async ({ page }) => {
+  test(`deduction controls fit ${viewport.name} without overflow`, async ({
+    page,
+  }) => {
     await page.setViewportSize(viewport)
     await enterActiveMission(page)
-    const board = page.getByRole('group', {
-      name: 'Three by three coolant-routing board',
-    })
-    await expect(board).toBeVisible()
     await assertNoHorizontalOverflow(page)
-    const boxes = await board
-      .getByRole('button')
-      .evaluateAll((tiles) =>
-        tiles.map((tile) => tile.getBoundingClientRect().width),
-      )
-    expect(Math.min(...boxes)).toBeGreaterThan(80)
+    await assertControlsInsideViewport(page)
+    await expect(
+      page.getByRole('list', { name: 'Experiment history' }),
+    ).toContainText('INITIAL')
+    await changeValveWithVisibleFocus(page)
   })
 }
 
-test('viewport orientation changes preserve puzzle state', async ({ page }) => {
+test('viewport orientation changes preserve positions, knowledge, expenditure and experiment history', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 360, height: 640 })
   await enterActiveMission(page)
-  const tile = page.getByRole('button', {
-    name: /Row 1, column 2, straight pipe/,
-  })
-  await tile.click()
-  await expect(tile).toHaveAccessibleName(/open east and west/)
+  await page.getByLabel('V1 position').selectOption('B')
+  await page.getByLabel('Trace target').selectOption('C')
+  await expect(page.getByText('Trace charges: 2/2')).toBeVisible()
+  await expect(page.getByText('No fittings traced.')).toBeVisible()
+  await page
+    .getByRole('button', { name: 'Junction Trace', exact: true })
+    .click()
+  await expect(page.getByText('Fitting C: V3.u → V2.x')).toBeVisible()
+  const history = await page
+    .getByRole('list', { name: 'Experiment history' })
+    .textContent()
   await page.setViewportSize({ width: 640, height: 360 })
-  await expect(tile).toHaveAccessibleName(/open east and west/)
+  await expect(page.getByLabel('V1 position')).toHaveValue('B')
+  await expect(page.getByText('Fitting C: V3.u → V2.x')).toBeVisible()
+  await expect(page.getByText('Trace charges: 1/2')).toBeVisible()
+  await expect(
+    page.getByRole('list', { name: 'Experiment history' }),
+  ).toHaveText(history!)
   await assertNoHorizontalOverflow(page)
+  await assertControlsInsideViewport(page)
 })
 
-test('reduced motion removes tile rotation animation', async ({ page }) => {
+test('reduced motion preserves immediate valve experiments and removes nonessential transition motion', async ({
+  page,
+}) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await enterActiveMission(page)
-  const graphic = page.locator('.coolant-tile__graphic').first()
-  expect(
-    await graphic.evaluate((node) => getComputedStyle(node).animationName),
-  ).toBe('none')
+  await changeValveWithVisibleFocus(page)
+  await expect(page.getByText('Experiment history (2)')).toBeVisible()
+  const motion = await page
+    .locator('.coolant-deduction select, .mission-flow-stage')
+    .evaluateAll((elements) =>
+      elements.map((element) => {
+        const style = getComputedStyle(element)
+        return {
+          animation: style.animationName,
+          transition: Number.parseFloat(style.transitionDuration),
+        }
+      }),
+    )
+  for (const style of motion) {
+    expect(style.animation).toBe('none')
+    expect(style.transition).toBeLessThanOrEqual(0.00001)
+  }
 })
 
-test('remains operable at 200 percent page zoom without board overflow', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 768, height: 1024 })
-  await enterActiveMission(page)
-  await page.evaluate(() => {
-    document.documentElement.style.zoom = '2'
+for (const viewport of [
+  { name: '200 percent page zoom', width: 768, height: 1024, zoom: 2 },
+  { name: '180px ultra-narrow reflow', width: 180, height: 900, zoom: 1 },
+]) {
+  test(`remains operable at ${viewport.name} without control or focus clipping`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport)
+    await enterActiveMission(page)
+    await page.evaluate((zoom) => {
+      document.documentElement.style.zoom = String(zoom)
+    }, viewport.zoom)
+    await assertNoHorizontalOverflow(page)
+    await assertControlsInsideViewport(page)
+    await changeValveWithVisibleFocus(page)
+    await page.getByLabel('Trace target').selectOption('A')
+    await page
+      .getByRole('button', { name: 'Junction Trace', exact: true })
+      .click()
+    await expect(page.getByText('Fitting A: V1.A → V2.q')).toBeVisible()
+    await page.getByRole('button', { name: 'Reset routing' }).click()
+    await expect(page.getByLabel('V1 position')).toHaveValue('A')
+    await expect(page.getByText('Trace charges: 1/2')).toBeVisible()
+    await expect(page.getByText('Experiment history (3)')).toBeVisible()
+    const history = page.getByRole('list', { name: 'Experiment history' })
+    await history.focus()
+    await expect(history).toBeFocused()
+    await expect(history).toContainText('ROUTING RESET')
+    await expect(
+      page.getByRole('button', { name: 'Pause mission' }),
+    ).toBeVisible()
   })
-  await expect(
-    page.getByRole('group', { name: 'Three by three coolant-routing board' }),
-  ).toBeVisible()
-  await assertNoHorizontalOverflow(page)
-  await assertTilesInsideViewport(page)
-  await rotateAndCheckFocusedEdgeTile(page)
-  await expect(page.getByRole('button', { name: 'Request hint' })).toBeVisible()
-  await expect(
-    page.getByRole('button', { name: 'Pause mission' }),
-  ).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Reset puzzle' })).toBeVisible()
-})
+}
 
-test('reflows below 320 CSS pixels while preserving usable tiles', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 180, height: 900 })
-  await enterActiveMission(page)
-  const board = page.getByRole('group', {
-    name: 'Three by three coolant-routing board',
-  })
-  await expect(board).toBeVisible()
-  await assertNoHorizontalOverflow(page)
-  const layout = await board.evaluate((element) => ({
-    boardWidth: element.getBoundingClientRect().width,
-    tileWidths: [...element.querySelectorAll('.coolant-tile')].map(
-      (tile) => tile.getBoundingClientRect().width,
-    ),
-  }))
-  expect(layout.boardWidth).toBeLessThanOrEqual(180)
-  expect(Math.min(...layout.tileWidths)).toBeGreaterThanOrEqual(48)
-  await assertTilesInsideViewport(page)
-  await rotateAndCheckFocusedEdgeTile(page)
-  await expect(page.getByRole('button', { name: 'Request hint' })).toBeVisible()
-  await expect(
-    page.getByRole('button', { name: 'Pause mission' }),
-  ).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Reset puzzle' })).toBeVisible()
-})
-
-test('forced colors preserves a non-color distinction for receiving coolant', async ({
+test('forced colors preserves textual flow, discoveries, disabled states and keyboard focus', async ({
   page,
 }) => {
   await page.emulateMedia({ forcedColors: 'active' })
   await enterActiveMission(page)
+  const readings = page.getByRole('group', { name: 'Flow readings' })
+  await expect(readings.getByText('S: FLOW', { exact: true })).toBeVisible()
   await expect(
-    page.getByRole('group', { name: 'Three by three coolant-routing board' }),
+    readings.getByText('reactor: NO FLOW', { exact: true }),
   ).toBeVisible()
-  const distinction = await page.evaluate(() => {
-    const receivingTiles = document.querySelectorAll(
-      '.coolant-tile[data-receiving-coolant]',
-    )
-    const inactiveTiles = document.querySelectorAll(
-      '.coolant-tile:not([data-receiving-coolant])',
-    )
-    const activePatterns = document.querySelectorAll(
-      '.coolant-tile[data-receiving-coolant] .coolant-tile__flow-pattern',
-    )
-    const inactivePatterns = document.querySelectorAll(
-      '.coolant-tile:not([data-receiving-coolant]) .coolant-tile__flow-pattern',
-    )
-    const pattern = activePatterns.item(0)
-    const patternStyle = pattern === null ? null : getComputedStyle(pattern)
-    return {
-      receivingTileCount: receivingTiles.length,
-      inactiveTileCount: inactiveTiles.length,
-      activePatternCount: activePatterns.length,
-      inactivePatternCount: inactivePatterns.length,
-      dashArray: patternStyle?.strokeDasharray ?? 'none',
-      strokeWidth: Number.parseFloat(patternStyle?.strokeWidth ?? '0'),
-    }
-  })
-  expect(distinction.receivingTileCount).toBeGreaterThan(0)
-  expect(distinction.inactiveTileCount).toBeGreaterThan(0)
-  expect(distinction.activePatternCount).toBeGreaterThan(0)
-  expect(distinction.inactivePatternCount).toBe(0)
-  expect(distinction.dashArray).not.toBe('none')
-  expect(distinction.strokeWidth).toBeGreaterThan(0)
+  await changeValveWithVisibleFocus(page)
+  await page
+    .getByRole('button', { name: 'Junction Trace', exact: true })
+    .click()
+  await expect(page.getByText('Fitting A: V1.A → V2.q')).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Junction Trace', exact: true }),
+  ).toBeDisabled()
+  await expect(page.getByLabel('V1 position')).toHaveValue('B')
 })
 
 test('manual pause freezes controls and restores logical keyboard focus', async ({
   page,
 }) => {
   await enterActiveMission(page)
-  const tile = page.getByRole('button', { name: /Row 1, column 2/ })
-  const before = await tile.getAttribute('aria-label')
+  const tile = page.getByLabel('V1 position')
+  await tile.selectOption('B')
+  await page.getByLabel('Trace target').selectOption('C')
+  await page
+    .getByRole('button', { name: 'Junction Trace', exact: true })
+    .click()
+  const historyBefore = await page
+    .getByRole('list', { name: 'Experiment history' })
+    .textContent()
+  const before = await tile.inputValue()
   await page.getByRole('button', { name: 'Pause mission' }).click()
   const resume = page.getByRole('button', { name: 'Resume mission' })
   await expect(resume).toBeFocused()
@@ -255,16 +266,24 @@ test('manual pause freezes controls and restores logical keyboard focus', async 
   await expect(
     page.getByRole('button', { name: 'Pause mission' }),
   ).toBeFocused()
-  await expect(tile).toHaveAttribute('aria-label', before!)
+  await expect(tile).toHaveValue(before)
+  await expect(page.getByText('Fitting C: V3.u → V2.x')).toBeVisible()
+  await expect(page.getByText('Trace charges: 1/2')).toBeVisible()
+  await expect(
+    page.getByRole('list', { name: 'Experiment history' }),
+  ).toHaveText(historyBefore!)
 })
 
 test('stale signal pauses exactly once, retains the puzzle, and requires explicit resume', async ({
   page,
 }) => {
   await enterActiveMission(page)
-  const tile = page.getByRole('button', { name: /Row 1, column 2/ })
-  await tile.click()
-  const retainedOrientation = await tile.getAttribute('aria-label')
+  const tile = page.getByLabel('V1 position')
+  await tile.selectOption('B')
+  await page
+    .getByRole('button', { name: 'Junction Trace', exact: true })
+    .click()
+  const retainedOrientation = await tile.inputValue()
   await page.getByRole('button', { name: 'Stop Samples' }).click()
 
   await expect(
@@ -282,7 +301,10 @@ test('stale signal pauses exactly once, retains the puzzle, and requires explici
     'data-mission-duration-below-range-ms',
     'data-mission-duration-operational-ms',
     'data-mission-duration-above-range-ms',
-    'data-mission-hint-eligibility-ms',
+    'data-mission-valve-adjustments',
+    'data-mission-traces-spent',
+    'data-mission-observation-count',
+    'data-mission-discovery-count',
     'data-mission-stability',
   ] as const
   const frozenValues = Object.fromEntries(
@@ -315,7 +337,7 @@ test('stale signal pauses exactly once, retains the puzzle, and requires explici
       frozenValues[attribute]!,
     )
   }
-  await expect(tile).toHaveAttribute('aria-label', retainedOrientation!)
+  await expect(tile).toHaveValue(retainedOrientation)
   await expect(
     page.getByRole('button', { name: 'Resume mission' }),
   ).toHaveAttribute('aria-disabled', 'true')

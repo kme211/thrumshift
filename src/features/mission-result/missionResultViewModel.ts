@@ -296,8 +296,11 @@ export function createMissionResultViewModel(
         'Coolant route',
         result.puzzleCompleted ? 'Completed' : 'Incomplete',
       ),
-      metric('Puzzle moves', countLabel(result.puzzleMoveCount, 'move')),
-      metric('Hint use', result.hintUsed ? 'Hint used' : 'No hint used'),
+      metric(
+        'Valve adjustments',
+        countLabel(result.valveAdjustmentCount, 'adjustment'),
+      ),
+      metric('Junction Traces', countLabel(result.junctionTraceCount, 'trace')),
     ],
     interruptionMetrics,
     rating: createRating(result, percentages),

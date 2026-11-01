@@ -1,7 +1,7 @@
 import type { TargetRange } from '../heart-rate/classifier'
 import type { MissionOutcome } from './activeMission'
 
-export const MISSION_RESULT_SCHEMA_VERSION = 1 as const
+export const MISSION_RESULT_SCHEMA_VERSION = 2 as const
 
 export interface MissionResult {
   readonly schemaVersion: typeof MISSION_RESULT_SCHEMA_VERSION
@@ -30,8 +30,8 @@ export interface MissionResult {
   readonly pauseCount: number
   readonly disconnectCount: number
   readonly disconnectedDurationMs: number
-  readonly puzzleMoveCount: number
-  readonly hintUsed: boolean
+  readonly valveAdjustmentCount: number
+  readonly junctionTraceCount: number
   readonly puzzleCompleted: boolean
 }
 
@@ -215,11 +215,14 @@ function canonicalMissionResult(runtime: RuntimeObject): MissionResult {
       required(runtime, 'disconnectedDurationMs'),
       'missionResult.disconnectedDurationMs',
     ),
-    puzzleMoveCount: nonnegativeCount(
-      required(runtime, 'puzzleMoveCount'),
-      'missionResult.puzzleMoveCount',
+    valveAdjustmentCount: nonnegativeCount(
+      required(runtime, 'valveAdjustmentCount'),
+      'missionResult.valveAdjustmentCount',
     ),
-    hintUsed: boolean(required(runtime, 'hintUsed'), 'missionResult.hintUsed'),
+    junctionTraceCount: nonnegativeCount(
+      required(runtime, 'junctionTraceCount'),
+      'missionResult.junctionTraceCount',
+    ),
     puzzleCompleted: boolean(
       required(runtime, 'puzzleCompleted'),
       'missionResult.puzzleCompleted',

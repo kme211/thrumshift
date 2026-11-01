@@ -52,13 +52,13 @@ async function enterMission(page: Page, origin = 0) {
 }
 
 async function solvePuzzle(page: Page, origin: number) {
-  for (const [offset, name] of [
-    [100, /Row 1, column 2, straight pipe/],
-    [200, /Row 2, column 1, corner pipe/],
-    [300, /Row 3, column 2, straight pipe/],
+  for (const [offset, valve, position] of [
+    [100, 'V1', 'B'],
+    [200, 'V2', 'II'],
+    [300, 'V3', 'v'],
   ] as const) {
     await setTestTime(page, origin + offset)
-    await page.getByRole('button', { name }).click()
+    await page.getByLabel(`${valve} position`).selectOption(position)
   }
 }
 
@@ -139,8 +139,8 @@ test('presents known successful metrics and retains the live source through keyb
   await expect(page.getByText('0 events', { exact: true })).toHaveCount(2)
   await expect(page.getByText('Station stability remaining')).toBeVisible()
   await expect(page.getByText('100 of 100')).toBeVisible()
-  await expect(page.getByText('3 moves')).toBeVisible()
-  await expect(page.getByText('No hint used')).toBeVisible()
+  await expect(page.getByText('3 adjustments')).toBeVisible()
+  await expect(page.getByText('0 traces')).toBeVisible()
   await expect(
     page.getByText('Controlled Finish', { exact: true }),
   ).toBeVisible()
@@ -201,7 +201,7 @@ test('presents known failed metrics and returns to a connected briefing', async 
   ).toBeVisible()
   await expect(page.getByText('Station stability remaining')).toBeVisible()
   await expect(page.getByText('0 of 100')).toBeVisible()
-  await expect(page.getByText('0 moves')).toBeVisible()
+  await expect(page.getByText('0 adjustments')).toBeVisible()
   await expect(
     page
       .getByRole('region', { name: 'Performance rating' })
@@ -240,10 +240,12 @@ test('shows sparse signal honestly and resets puzzle, metrics, and warm-up twice
 
   await page.getByRole('button', { name: 'Run Again' }).click()
   await enterMission(page, 100_000)
-  const topTile = page.getByRole('button', {
-    name: /Row 1, column 2, straight pipe, open north and south/,
-  })
-  await expect(topTile).toBeVisible()
+  await expect(page.getByLabel('V1 position')).toHaveValue('A')
+  await expect(page.getByLabel('V2 position')).toHaveValue('I')
+  await expect(page.getByLabel('V3 position')).toHaveValue('u')
+  await expect(page.getByText('Trace charges: 2/2')).toBeVisible()
+  await expect(page.getByText('No fittings traced.')).toBeVisible()
+  await expect(page.getByText('Experiment history (1)')).toBeVisible()
   const diagnostics = page.getByRole('complementary', {
     name: 'Development diagnostics',
   })
@@ -252,7 +254,7 @@ test('shows sparse signal honestly and resets puzzle, metrics, and warm-up twice
     '0',
   )
   await solvePuzzle(page, 116_000)
-  await expect(page.getByText('3 moves')).toBeVisible()
+  await expect(page.getByText('3 adjustments')).toBeVisible()
   await page.getByRole('button', { name: 'Run Again' }).click()
   await expect(page.getByText('Connection:')).toContainText('connected')
   await expect(

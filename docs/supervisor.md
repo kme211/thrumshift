@@ -11,6 +11,45 @@ This repository supports a DEEP-only initial rollout using the local codex-super
 - The supervisor resumes quota-interrupted work with the same role session and saved files. Do not restart the whole workflow, discard partial work, or create nested orchestration.
 - Return the host's structured report and handoff. Successful plan, implementation and review use `status: continue`; only publication may report `ready_for_review`.
 
+### Optional narrative preparation within DEEP
+
+LIGHT/DEEP specifies workflow rigor. Narrative preparation is a separate optional capability within the existing `plan` phase; there are no `deep-narrative` or `deep-continuity` workflows. This repository remains DEEP-first. A future LIGHT route can cover settled, bounded work after the reviewed workflow has been exercised; this change does not enable it.
+
+The updated host supports explicit named preparation profiles on this same DEEP workflow. The example configuration declares a single narrative preparation role with `full` and `continuity` profiles. They are repository instructions, not additional workflow classes or automatic routing rules.
+
+From the supervisor checkout, after both infrastructure/support changes are merged, the host is rebuilt/restarted and the local project configuration has been updated:
+
+```sh
+# Ordinary DEEP: no preparation, no narrative dependency
+npm start -- enqueue thrumshift ISSUE --workflow deep
+
+# Story-bearing work: full narrative preparation on the same DEEP route
+npm start -- enqueue thrumshift ISSUE --workflow deep --preparation full
+
+# Bounded changes to existing narrative: focused continuity assessment
+npm start -- enqueue thrumshift ISSUE --workflow deep --preparation continuity
+```
+
+Use an appropriate existing assigned story; do not create a synthetic trial ticket. Non-narrative domain, lifecycle and puzzle implementation stories can proceed normally without waiting for narrative support or the service-record payoff. Preparation applies only when assigned changes affect story meaning, knowledge, artifacts, clues, canon or reveal sequencing. Selecting it is explicit for this rollout; auto-pick remains unchanged and creates ordinary unprepared jobs.
+
+Read `.agents/skills/thrumshift-narrative/SKILL.md` for the role/audit contract. `docs/lore.md` remains shared narrative authority; use one compact mission brief per story-bearing mission. The example freezes the common skill/template/lore and the Reactor Cooling Failure draft. Tailor the declared inputs to the assigned mission and include its approved puzzle-design source when available; do not add unrelated mission dependencies.
+
+Preparation and the main planner have distinct saved sessions. The host saves read-only preparation output and allows one consolidated revision request before implementation. Successful preparation uses `status: continue`, `decision: PREPARED`, `implementation: null` and `uiEvidence: null`. Every unresolved prerequisite belongs in `preparation.openItems`; the host will not accept IMPLEMENT until those items are resolved. The main planner owns the final puzzle/implementation plan and acknowledges the exact preparation digest. Implementers may not invent consequential narrative details. Independent review audits accepted preparation alongside normal validation.
+
+The draft Reactor Cooling Failure brief records normal-success presentation, local archive access, source chronology and protected unknowns. It does not choose the technical observation or implement the payoff. Concretely bind the record to approved deduction behavior before implementation of that separately assigned narrative task; the record cannot supply previously unavailable information needed to solve the puzzle.
+
+Ordinary retry preserves preparation selection, session and revision budget. Changing it on an existing blocked/waiting job requires an explicit workflow restart, which archives the prior contract:
+
+```sh
+npm start -- retry JOB_ID --workflow deep --preparation full
+# Deliberately restart without preparation:
+npm start -- retry JOB_ID --workflow deep --preparation none
+```
+
+An explicit workflow restart retains the selected profile unless `--preparation none` is supplied. Never use a restart to silently discard partial work or evade an unresolved narrative decision. Existing job/work ownership gates still apply.
+
+Preparation is optional: ordinary jobs do not trigger its state migration. The first selected preparation job upgrades the shared host state to version 2, which older runners reject. Stop/restart the host safely before enabling the new local configuration; do not downgrade state or remove lock files. No role, documentation or example configuration file starts a job or enables automatic selection by itself.
+
 ## Evidence and publication
 
 The planner must identify concrete affected invariants, exact validation commands and an explicit UI-evidence decision. A visible UI/interaction change normally requires inspected before/after captures from comparable states, covering relevant desktop/mobile layouts and accessibility behavior. SKIP requires a reason grounded in the assigned scope. Do not regenerate unrelated visual references.
@@ -61,4 +100,4 @@ Actual Bluetooth/Android/monitor checks are manual gates when the issue requires
 
 The currently configured GitHub Actions workflow, `.github/workflows/dependabot-ci.yml`, runs verification only for Dependabot PRs. A separate Cloudflare Workers Builds integration can also report checks on ordinary PRs. Inspect the actual check results: a skipped Dependabot job does not prove feature validation, and a build-only check does not prove the unit/browser suites ran. Local canonical validation and independent evidence review remain required, and failed applicable remote checks block readiness. Do not change CI or deployment settings as an unrelated side effect.
 
-There are currently no GitHub issues or milestones selected for supervision. The maintainer will choose the first feature later. Keep auto-pick disabled; do not convert the roadmap/backlog into issues, create a milestone, or start a job automatically.
+Existing stories #16–#19 track the deduction redesign implementation chain under #15. Choose an appropriate existing story explicitly for the first supervised run; preserve their dependency order and assigned scope. The narrative-support tracking issue is documentation/infrastructure work, not a synthetic gameplay trial. Keep auto-pick disabled; do not convert the roadmap/backlog into more issues, create a milestone, or start a job automatically as setup.

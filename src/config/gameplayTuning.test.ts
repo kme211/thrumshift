@@ -28,7 +28,6 @@ describe('gameplay tuning', () => {
       'nonpositive statistics duration threshold',
       { missionStatistics: { minimumUsableDurationMs: 0 } },
     ],
-    ['nonpositive hint delay', { puzzle: { hintEligibilityMs: 0 } }],
   ])('rejects %s', (_name, change) => {
     const tuning: GameplayTuning = {
       ...defaultGameplayTuning,
@@ -59,10 +58,6 @@ describe('gameplay tuning', () => {
       missionStatistics: {
         ...defaultGameplayTuning.missionStatistics,
         ...('missionStatistics' in change ? change.missionStatistics : {}),
-      },
-      puzzle: {
-        ...defaultGameplayTuning.puzzle,
-        ...('puzzle' in change ? change.puzzle : {}),
       },
     }
     expect(() => validateGameplayTuning(tuning)).toThrow(RangeError)

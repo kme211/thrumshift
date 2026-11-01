@@ -122,8 +122,8 @@ describe('mission result view model', () => {
     ])
     expect(view.puzzleMetrics).toEqual([
       { label: 'Coolant route', value: 'Completed' },
-      { label: 'Puzzle moves', value: '8 moves' },
-      { label: 'Hint use', value: 'Hint used' },
+      { label: 'Valve adjustments', value: '8 adjustments' },
+      { label: 'Junction Traces', value: '1 trace' },
     ])
   })
 
@@ -143,7 +143,7 @@ describe('mission result view model', () => {
     })
   })
 
-  it('formats exact duration, singular counts, zero events, and unused hints', () => {
+  it('formats exact duration, singular counts, zero events, and unused traces', () => {
     const view = createMissionResultViewModel(
       buildMissionResult({
         finalizedAtTimeMs: 62_500,
@@ -160,8 +160,8 @@ describe('mission result view model', () => {
         suspendedDurationMs: 4_000,
         lowOutputEpisodeCount: 1,
         overloadEpisodeCount: 0,
-        puzzleMoveCount: 1,
-        hintUsed: false,
+        valveAdjustmentCount: 1,
+        junctionTraceCount: 0,
       }),
     )
     expect(view.duration.value).toBe('1:02')
@@ -170,12 +170,12 @@ describe('mission result view model', () => {
       { label: 'Overload events', value: '0 events' },
     ])
     expect(view.puzzleMetrics).toContainEqual({
-      label: 'Puzzle moves',
-      value: '1 move',
+      label: 'Valve adjustments',
+      value: '1 adjustment',
     })
     expect(view.puzzleMetrics).toContainEqual({
-      label: 'Hint use',
-      value: 'No hint used',
+      label: 'Junction Traces',
+      value: '0 traces',
     })
   })
 
@@ -344,6 +344,19 @@ describe('mission result view model', () => {
       createMissionResultViewModel(buildFailedMissionResult()).rating.label,
     ).toBe('Incomplete')
   })
+
+  it.each([0, 1, 2])(
+    'keeps rating and criteria unchanged after %s Junction Traces',
+    (junctionTraceCount) => {
+      const baseline = createMissionResultViewModel(
+        buildMissionResult({ junctionTraceCount: 0 }),
+      ).rating
+      expect(
+        createMissionResultViewModel(buildMissionResult({ junctionTraceCount }))
+          .rating,
+      ).toEqual(baseline)
+    },
+  )
 
   it('is deterministic and does not mutate its deeply frozen input', () => {
     const result = buildMissionResult()

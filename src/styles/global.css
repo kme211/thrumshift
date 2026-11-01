@@ -2941,3 +2941,87 @@ button:disabled {
     animation: none !important;
   }
 }
+
+/* Minimal deduction control adapter; the full schematic is a separate surface. */
+.coolant-deduction {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.coolant-deduction button {
+  min-width: 0;
+  width: 100%;
+}
+.coolant-deduction p {
+  margin: 0;
+}
+.coolant-deduction fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.coolant-deduction legend,
+.coolant-deduction h3 {
+  margin-bottom: 0.5rem;
+  color: var(--display-amber);
+}
+.coolant-deduction label {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.coolant-deduction select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+}
+.coolant-deduction option {
+  color: var(--equipment-label);
+  background: var(--equipment-casing);
+}
+.coolant-deduction__valves {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.coolant-deduction__readings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+.coolant-deduction__readings [data-flow='true'] {
+  color: var(--display-cyan);
+}
+.coolant-deduction__trace {
+  display: grid;
+  gap: 0.6rem;
+}
+.coolant-deduction summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding-block: 0.5rem;
+}
+.coolant-deduction__history ol {
+  max-height: 12rem;
+  overflow-y: auto;
+  list-style: none;
+  padding: 0.25rem;
+  margin: 0;
+}
+.coolant-deduction__history li {
+  display: grid;
+  gap: 0.3rem;
+  padding-block: 0.6rem;
+  border-bottom: 1px solid currentColor;
+  font-size: 0.8rem;
+}
+.coolant-deduction__note {
+  font-size: 0.8rem;
+}
+@media (max-width: 320px) {
+  .coolant-deduction__valves {
+    grid-template-columns: 1fr;
+  }
+}

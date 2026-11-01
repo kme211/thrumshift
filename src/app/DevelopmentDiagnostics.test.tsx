@@ -127,8 +127,20 @@ describe('DevelopmentDiagnostics', () => {
       '303',
     )
     expect(values).toHaveAttribute(
-      'data-mission-hint-eligibility-ms',
-      String(run.hintEligibilityMs),
+      'data-mission-valve-adjustments',
+      String(run.puzzle.adjustments),
+    )
+    expect(values).toHaveAttribute(
+      'data-mission-traces-spent',
+      String(run.puzzle.tracesSpent),
+    )
+    expect(values).toHaveAttribute(
+      'data-mission-observation-count',
+      String(run.puzzle.observations.length),
+    )
+    expect(values).toHaveAttribute(
+      'data-mission-discovery-count',
+      String(run.puzzle.discoveries.length),
     )
     expect(values).toHaveAttribute('data-mission-stability', '72.3456789')
   })

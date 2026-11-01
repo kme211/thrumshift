@@ -65,8 +65,8 @@ function gateFact(fact: MissionSessionFact): MissionFact {
       return fact
     case 'timeAdvanced':
     case 'heartRateSample':
-    case 'puzzleTileRotated':
-    case 'puzzleHintRequested':
+    case 'puzzleValveChanged':
+    case 'puzzleTraceRequested':
     case 'puzzleReset':
       return {
         type: 'timeAdvanced',
@@ -139,8 +139,8 @@ function createResult(
     pauseCount: statistics.pauseCount,
     disconnectCount: statistics.disconnectCount,
     disconnectedDurationMs: statistics.disconnectedDurationMs,
-    puzzleMoveCount: statistics.puzzleMoveCount,
-    hintUsed: statistics.hintUsed,
+    valveAdjustmentCount: statistics.valveAdjustmentCount,
+    junctionTraceCount: statistics.junctionTraceCount,
     puzzleCompleted: statistics.puzzleCompleted,
   })
 }

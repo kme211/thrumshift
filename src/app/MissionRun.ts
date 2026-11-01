@@ -2,9 +2,9 @@ import type {
   ClassifierState,
   TargetRange,
 } from '../domain/heart-rate/classifier'
-import { reactorCoolingEasy } from '../domain/puzzle/legacy/boards/reactorCoolingEasy'
-import { createPuzzleState } from '../domain/puzzle/legacy/model'
-import type { PuzzleHint, PuzzleState } from '../domain/puzzle/legacy/types'
+import { reactorCooling } from '../domain/puzzle/reactorCooling'
+import { createPuzzleState } from '../domain/puzzle/model'
+import type { PuzzleState } from '../domain/puzzle/types'
 import { createMissionSessionState } from '../domain/mission/missionSession'
 import type { MissionSessionState } from '../domain/mission/missionSession'
 import type { GameplayTuning } from '../config/gameplayTuning'
@@ -17,9 +17,6 @@ export interface MissionRun {
   readonly classifier: ClassifierState
   readonly puzzle: PuzzleState
   readonly session: MissionSessionState
-  readonly hint: PuzzleHint | null
-  readonly puzzleRotationCounts: Readonly<Record<string, number>>
-  readonly hintEligibilityMs: number
 }
 
 export function createMissionRun(
@@ -30,21 +27,7 @@ export function createMissionRun(
 ): MissionRun {
   return {
     classifier,
-    puzzle: createPuzzleState(reactorCoolingEasy),
+    puzzle: createPuzzleState(reactorCooling),
     session: createMissionSessionState(occurredAt, targetRange, tuning),
-    hint: null,
-    puzzleRotationCounts: {},
-    hintEligibilityMs: tuning.puzzle.hintEligibilityMs,
   }
-}
-
-export function getMissionHintEligibility(run: MissionRun): {
-  readonly eligible: boolean
-  readonly remainingMs: number
-} {
-  const remainingMs = Math.max(
-    0,
-    run.hintEligibilityMs - run.session.mission.activeElapsedTimeMs,
-  )
-  return { eligible: remainingMs === 0, remainingMs }
 }

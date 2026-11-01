@@ -29,10 +29,10 @@ export type MissionSessionFact = OrderedSessionFact &
         readonly suspended: boolean
         readonly disconnected: boolean
       }
-    | { readonly type: 'puzzleTileRotated' }
-    /** Requesting or displaying a useful hint constitutes hint use. */
-    | { readonly type: 'puzzleHintRequested' }
-    /** Reset changes no metric: moves and prior hint use remain cumulative. */
+    | { readonly type: 'puzzleValveChanged' }
+    /** Emitted only for a domain change staged by the run owner. */
+    | { readonly type: 'puzzleTraceRequested' }
+    /** Reset retains cumulative adjustments and trace expenditure. */
     | { readonly type: 'puzzleReset' }
     | { readonly type: 'puzzleCompleted' }
   )
@@ -79,8 +79,8 @@ export interface MissionStatisticsState {
   readonly bpmSegment: BpmSegment | null
   readonly weightedBpmMilliseconds: number
   readonly bpmCoverageDurationMs: number
-  readonly puzzleMoveCount: number
-  readonly hintUsed: boolean
+  readonly valveAdjustmentCount: number
+  readonly junctionTraceCount: number
   readonly puzzleCompleted: boolean
 }
 
@@ -137,8 +137,8 @@ export function createMissionStatisticsState(
     bpmSegment: null,
     weightedBpmMilliseconds: 0,
     bpmCoverageDurationMs: 0,
-    puzzleMoveCount: 0,
-    hintUsed: false,
+    valveAdjustmentCount: 0,
+    junctionTraceCount: 0,
     puzzleCompleted: false,
   }
 }
@@ -368,10 +368,18 @@ export function transitionMissionStatistics(
         interval.behavior,
         transitionTimeMs,
       )
-    } else if (fact.type === 'puzzleTileRotated') {
-      state = { ...state, puzzleMoveCount: state.puzzleMoveCount + 1 }
-    } else if (fact.type === 'puzzleHintRequested') {
-      state = { ...state, hintUsed: true }
+    } else if (
+      fact.type === 'puzzleValveChanged' &&
+      !finalized &&
+      missionTransition.resultingBehavior !== 'suspended'
+    ) {
+      state = { ...state, valveAdjustmentCount: state.valveAdjustmentCount + 1 }
+    } else if (
+      fact.type === 'puzzleTraceRequested' &&
+      !finalized &&
+      missionTransition.resultingBehavior !== 'suspended'
+    ) {
+      state = { ...state, junctionTraceCount: state.junctionTraceCount + 1 }
     } else if (fact.type === 'puzzleCompleted') {
       state = { ...state, puzzleCompleted: true }
     }

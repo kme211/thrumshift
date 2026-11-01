@@ -41,10 +41,10 @@ Out-of-range classification also carries direction independent of color: `▲ AB
 - Desktop uses one console frame with a top identity/status rail, two unequal equipment bays, and a bottom command row.
 - The telemetry bay is the dominant readout; the routing bay is the active service surface.
 - The 110 BPM value is the first focal point. Station stability is secondary but remains in the same familiar instrument.
-- The coolant puzzle remains a 3×3 schematic and retains its existing instruction, hint, and reset hierarchy.
+- The current runtime uses a minimal deduction adapter: labeled native valve selectors, textual flow readings, public routing reference, targeted Junction Trace preview/action, discoveries, compact experiment history and Reset routing. It reuses the equipment and CRT surfaces; the full schematic/fog rollout remains separate.
 - Mobile keeps the same visual identity but stacks modules and reduces framing density before reducing control size or legibility.
 - At 390px, the outer enclosure loses its corner fasteners and uses shallower casing depth. Module label strips, recessed CRT edges, state lamps, and physical control faces remain because they carry the equipment identity.
-- Narrow layouts condense secondary status metadata and omit the redundant control-bus legend. They do not shrink the coolant matrix, primary telemetry, or touch targets to recover space.
+- Narrow layouts condense secondary status metadata and omit the redundant control-bus legend. They preserve legible routing controls, primary telemetry and touch targets.
 - Development diagnostics remain outside the product console and use a quieter service-panel treatment.
 - Simulator mode adds `SIM-04 OUTPUT CONTROL` beneath the Biometric Regulator instructions. `LOW` (90 BPM), `IN RANGE` (110 BPM), and `HIGH` (160 BPM) are fixed training presets; the active output is repeated as a numeric readout and an illuminated `aria-pressed` control.
 - The simulator output bank is absent in Bluetooth mode. It calls the simulator source directly, so BPM changes still pass through the normal telemetry, classification, stability, and mission systems.
@@ -52,8 +52,10 @@ Out-of-range classification also carries direction independent of color: `▲ AB
 
 ## Motion and wear
 
-- No decorative animation was added. Existing tile rotation feedback remains the only routine motion and still respects reduced-motion preferences.
+- Deduction controls update directly from accepted run state, with no animation callback or delay controlling gameplay. Existing mission transitions respect reduced-motion preferences.
 - Wear is implied through material depth, assembled edges, and service labels rather than scratches, noise overlays, or arbitrary grunge.
+
+The following captures preserve the approved equipment language and earlier grid presentation. Current deduction controls replace that grid without changing the telemetry, suspension or control-deck hierarchy.
 
 ## Review captures
 

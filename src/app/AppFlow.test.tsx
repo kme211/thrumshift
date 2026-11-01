@@ -136,13 +136,17 @@ async function finishSuccessfulFlow(
   flow: ReturnType<typeof renderFlow>,
   origin = 0,
 ): Promise<void> {
-  for (const [index, name] of [
-    /Row 1, column 2, straight pipe/,
-    /Row 2, column 1, corner pipe/,
-    /Row 3, column 2, straight pipe/,
-  ].entries()) {
+  for (const [index, [valve, position]] of (
+    [
+      ['V1', 'B'],
+      ['V2', 'II'],
+      ['V3', 'v'],
+    ] as const
+  ).entries()) {
     flow.setTime(origin + 16_100 + index * 100)
-    fireEvent.click(screen.getByRole('button', { name }))
+    fireEvent.change(screen.getByLabelText(`${valve} position`), {
+      target: { value: position },
+    })
   }
   expect(
     await screen.findByRole('heading', {
@@ -472,9 +476,9 @@ describe('AppFlow pre-mission and warm-up integration', () => {
       flow.setTime(time)
       act(() => flow.simulatedSource.emitSample(110))
     }
-    const tile = screen.getByRole('button', { name: /Row 1, column 2/ })
-    await user.click(tile)
-    const retainedOrientation = tile.getAttribute('aria-label')
+    const tile = screen.getByLabelText('V1 position')
+    await user.selectOptions(tile, 'B')
+    const retainedOrientation = (tile as HTMLSelectElement).value
     const connect = vi.spyOn(flow.simulatedSource, 'connect')
     const callsBefore = connect.mock.calls.length
 
@@ -494,7 +498,7 @@ describe('AppFlow pre-mission and warm-up integration', () => {
       screen.getByRole('heading', { name: 'Mission paused' }),
     ).toHaveFocus()
     expect(document.body).not.toHaveFocus()
-    expect(tile).toHaveAttribute('aria-label', retainedOrientation!)
+    expect(tile).toHaveValue(retainedOrientation)
     expect(
       screen.getByRole('button', { name: 'Resume mission' }),
     ).toHaveAttribute('aria-disabled', 'true')

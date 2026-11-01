@@ -16,10 +16,11 @@ import { advanceMissionSession } from '../domain/mission/missionSession'
 import type { MissionSessionFact } from '../domain/mission/missionStatistics'
 import {
   isPuzzleComplete,
-  resetPuzzle,
-  rotateTile,
-  selectPuzzleHint,
-} from '../domain/puzzle/legacy/model'
+  resetRouting,
+  changeValvePosition,
+  applyTrace,
+} from '../domain/puzzle/model'
+import { reactorCooling } from '../domain/puzzle/reactorCooling'
 import { createWarmupState, transitionWarmup } from '../domain/mission/warmup'
 import type { TelemetrySourceStatus } from '../telemetry/HeartRateTelemetrySource'
 import type { AppState } from './AppState'
@@ -117,13 +118,15 @@ export type MissionFlowFactPayload =
       readonly runGeneration: number
     }
   | {
-      readonly type: 'puzzleTileRotated'
+      readonly type: 'puzzleValveChanged'
       readonly occurredAt: number
       readonly runGeneration: number
-      readonly tileId: string
+      readonly valve: string
+      readonly position: string
     }
   | {
-      readonly type: 'puzzleHintRequested'
+      readonly type: 'puzzleTraceRequested'
+      readonly target: string
       readonly occurredAt: number
       readonly runGeneration: number
     }
@@ -344,7 +347,7 @@ function projectClassifierTransition(
 /**
  * Signal authority always precedes the external fact at the same occurrence
  * time. Derived classifier deadlines use offsets 1–5, pause invalidation uses
- * 6, and the external fact uses 8. Puzzle completion follows rotation at 9.
+ * 6, and the external fact uses 8. Puzzle completion follows the committed valve change at 9.
  */
 interface ActiveSignalAuthority {
   readonly run: MissionRun
@@ -749,9 +752,10 @@ function handleManualResume(
   }
 }
 
-function handlePuzzleRotation(
+/** Stage a pure candidate, then let mission ordering/failure accept its expenditure. */
+function handlePuzzleAction(
   state: MissionFlowState,
-  fact: FactOf<'puzzleTileRotated'>,
+  fact: FactOf<'puzzleValveChanged' | 'puzzleTraceRequested' | 'puzzleReset'>,
 ): MissionFlowState {
   const run = liveRun(state.lifecycle)
   if (run === null || state.lifecycle.phase !== 'activeMission') return state
@@ -761,181 +765,65 @@ function handlePuzzleRotation(
     fact.sequence,
   )
   let advanced = authority.run
-  if (advanced.session.result !== null) {
-    return {
-      ...state,
-      lifecycle: updateRunLifecycle(state.lifecycle, advanced),
-      announcement: announcementForActiveRunTransition(
-        run,
-        advanced,
-        state.announcement,
-        announcementTuning,
-      ),
-    }
-  }
-  if (authority.staleAt !== null) {
+  if (advanced.session.result === null && authority.staleAt !== null) {
     advanced = advanceSuspendedRun(advanced, fact.occurredAt, fact.sequence)
-    return {
-      ...state,
-      lifecycle: applyStaleReason(
-        updateRunLifecycle(state.lifecycle, advanced),
-        authority.staleAt,
-      ),
-      announcement: announcementForInterruption(
-        ['signalStale'],
-        state.announcement,
-      ),
-    }
-  }
-  advanced = advanceRun(advanced, {
-    type: 'puzzleTileRotated',
-    occurrenceTimeMs: fact.occurredAt,
-    sequence: subSequence(fact.sequence, EXTERNAL_FACT_SEQUENCE_OFFSET),
-  })
-  if (advanced.session.result !== null) {
-    return {
-      ...state,
-      lifecycle: updateRunLifecycle(state.lifecycle, advanced),
-      announcement: announcementForActiveRunTransition(
-        run,
-        advanced,
-        state.announcement,
-        announcementTuning,
-      ),
-    }
-  }
-  const puzzle = rotateTile(advanced.puzzle, fact.tileId)
-  if (puzzle === advanced.puzzle) return state
-  advanced = {
-    ...advanced,
-    puzzle,
-    hint: null,
-    puzzleRotationCounts: {
-      ...advanced.puzzleRotationCounts,
-      [fact.tileId]: (advanced.puzzleRotationCounts[fact.tileId] ?? 0) + 1,
-    },
-  }
-  if (isPuzzleComplete(puzzle)) {
+  } else if (advanced.session.result === null) {
+    const candidate =
+      fact.type === 'puzzleValveChanged'
+        ? changeValvePosition(
+            reactorCooling,
+            advanced.puzzle,
+            fact.valve,
+            fact.position,
+          )
+        : fact.type === 'puzzleTraceRequested'
+          ? applyTrace(reactorCooling, advanced.puzzle, fact.target)
+          : resetRouting(reactorCooling, advanced.puzzle)
+    const changed = candidate !== advanced.puzzle
     advanced = advanceRun(advanced, {
-      type: 'puzzleCompleted',
-      occurrenceTimeMs: fact.occurredAt,
-      sequence: subSequence(fact.sequence, PUZZLE_COMPLETION_SEQUENCE_OFFSET),
-    })
-  }
-  return {
-    ...state,
-    lifecycle: updateRunLifecycle(state.lifecycle, advanced),
-    announcement: isPuzzleComplete(puzzle)
-      ? 'Coolant route complete. Reactor flow restored.'
-      : state.announcement,
-  }
-}
-
-function handlePuzzleHintRequest(
-  state: MissionFlowState,
-  fact: FactOf<'puzzleHintRequested'>,
-): MissionFlowState {
-  const run = liveRun(state.lifecycle)
-  if (run === null || state.lifecycle.phase !== 'activeMission') return state
-  const authority = advanceActiveRunSignalAuthority(
-    run,
-    fact.occurredAt,
-    fact.sequence,
-  )
-  let advanced = authority.run
-  if (authority.staleAt !== null) {
-    advanced = advanceSuspendedRun(advanced, fact.occurredAt, fact.sequence)
-    return {
-      ...state,
-      lifecycle: applyStaleReason(
-        updateRunLifecycle(state.lifecycle, advanced),
-        authority.staleAt,
-      ),
-      announcement: announcementForInterruption(
-        ['signalStale'],
-        state.announcement,
-      ),
-    }
-  }
-  if (
-    advanced.session.result !== null ||
-    advanced.session.mission.activeElapsedTimeMs < advanced.hintEligibilityMs
-  ) {
-    return {
-      ...state,
-      lifecycle: updateRunLifecycle(state.lifecycle, advanced),
-    }
-  }
-  const hint = selectPuzzleHint(advanced.puzzle)
-  if (hint === null) return state
-  advanced = advanceRun(advanced, {
-    type: 'puzzleHintRequested',
-    occurrenceTimeMs: fact.occurredAt,
-    sequence: subSequence(fact.sequence, EXTERNAL_FACT_SEQUENCE_OFFSET),
-  })
-  if (advanced.session.result === null) {
-    advanced = { ...advanced, hint }
-  }
-  return {
-    ...state,
-    lifecycle: updateRunLifecycle(state.lifecycle, advanced),
-    announcement: state.announcement,
-  }
-}
-
-function handlePuzzleReset(
-  state: MissionFlowState,
-  fact: FactOf<'puzzleReset'>,
-): MissionFlowState {
-  const run = liveRun(state.lifecycle)
-  if (run === null || state.lifecycle.phase !== 'activeMission') return state
-  const authority = advanceActiveRunSignalAuthority(
-    run,
-    fact.occurredAt,
-    fact.sequence,
-  )
-  let advanced = authority.run
-  if (authority.staleAt !== null) {
-    advanced = advanceSuspendedRun(advanced, fact.occurredAt, fact.sequence)
-    return {
-      ...state,
-      lifecycle: applyStaleReason(
-        updateRunLifecycle(state.lifecycle, advanced),
-        authority.staleAt,
-      ),
-      announcement: announcementForInterruption(
-        ['signalStale'],
-        state.announcement,
-      ),
-    }
-  }
-  if (advanced.session.result === null) {
-    advanced = advanceRun(advanced, {
-      type: 'puzzleReset',
+      type: changed ? fact.type : 'timeAdvanced',
       occurrenceTimeMs: fact.occurredAt,
       sequence: subSequence(fact.sequence, EXTERNAL_FACT_SEQUENCE_OFFSET),
     })
-  }
-  if (advanced.session.result === null) {
-    advanced = {
-      ...advanced,
-      puzzle: resetPuzzle(advanced.puzzle),
-      hint: null,
-      puzzleRotationCounts: {},
+    // An accepted endpoint fact may finalize failure. It consumes nothing.
+    if (
+      advanced.session.result === null &&
+      advanced.session.mission.playState === 'active'
+    ) {
+      advanced = { ...advanced, puzzle: candidate }
+      if (
+        changed &&
+        fact.type === 'puzzleValveChanged' &&
+        isPuzzleComplete(reactorCooling, candidate)
+      ) {
+        advanced = advanceRun(advanced, {
+          type: 'puzzleCompleted',
+          occurrenceTimeMs: fact.occurredAt,
+          sequence: subSequence(
+            fact.sequence,
+            PUZZLE_COMPLETION_SEQUENCE_OFFSET,
+          ),
+        })
+      }
     }
   }
   return {
     ...state,
-    lifecycle: updateRunLifecycle(state.lifecycle, advanced),
+    lifecycle: applyStaleReason(
+      updateRunLifecycle(state.lifecycle, advanced),
+      authority.staleAt,
+    ),
     announcement:
-      advanced.session.result === null
-        ? state.announcement
-        : announcementForActiveRunTransition(
+      advanced.session.result !== null
+        ? announcementForActiveRunTransition(
             run,
             advanced,
             state.announcement,
             announcementTuning,
-          ),
+          )
+        : authority.staleAt !== null
+          ? announcementForInterruption(['signalStale'], state.announcement)
+          : state.announcement,
   }
 }
 
@@ -1516,12 +1404,10 @@ function reduceMissionFlow(
       return handleManualPause(state, fact)
     case 'manualResume':
       return handleManualResume(state, fact)
-    case 'puzzleTileRotated':
-      return handlePuzzleRotation(state, fact)
-    case 'puzzleHintRequested':
-      return handlePuzzleHintRequest(state, fact)
+    case 'puzzleValveChanged':
+    case 'puzzleTraceRequested':
     case 'puzzleReset':
-      return handlePuzzleReset(state, fact)
+      return handlePuzzleAction(state, fact)
     case 'status':
       return handleTelemetryStatus(state, fact)
     case 'sample':

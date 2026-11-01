@@ -37,8 +37,8 @@ function validResult(): MissionResult {
     pauseCount: 2,
     disconnectCount: 1,
     disconnectedDurationMs: 1_000,
-    puzzleMoveCount: 7,
-    hintUsed: true,
+    valveAdjustmentCount: 7,
+    junctionTraceCount: 1,
     puzzleCompleted: true,
   }
 }
@@ -48,7 +48,7 @@ describe('MissionResult serialization and runtime validation', () => {
     const serialized = serializeMissionResult(validResult())
     const result = deserializeMissionResult(serialized)
     expect(result).toEqual(validResult())
-    expect(result.schemaVersion).toBe(1)
+    expect(result.schemaVersion).toBe(2)
     expect(Object.isFrozen(result)).toBe(true)
     expect(Object.isFrozen(result.targetRange)).toBe(true)
   })
@@ -93,7 +93,7 @@ describe('MissionResult serialization and runtime validation', () => {
 
   it.each([
     ['outcome', 'abandoned'],
-    ['hintUsed', 'yes'],
+    ['junctionTraceCount', 'yes'],
     ['validSampleCount', 1.5],
     ['targetRange', '100-140'],
     ['minimumBpm', 100.5],
@@ -114,7 +114,7 @@ describe('MissionResult serialization and runtime validation', () => {
 
   it.each([
     ['negative duration', { suspendedDurationMs: -1 }],
-    ['negative count', { puzzleMoveCount: -1 }],
+    ['negative count', { valveAdjustmentCount: -1 }],
     ['unsafe count', { pauseCount: Number.MAX_SAFE_INTEGER + 1 }],
     ['unordered target', { targetRange: { lowerBpm: 140, upperBpm: 100 } }],
     ['inconsistent final time', { finalizedAtTimeMs: 10_099 }],
@@ -222,12 +222,23 @@ describe('MissionResult serialization and runtime validation', () => {
     ).toMatchObject(change)
   })
 
-  it.each([0, 2, 999])(
+  it.each([0, 1, 999])(
     'rejects unsupported schema version %s',
     (schemaVersion) => {
       expect(() =>
         validateMissionResult({ ...validResult(), schemaVersion }),
       ).toThrow(/Unsupported mission result schema version/)
+    },
+  )
+
+  it.each(['valveAdjustmentCount', 'junctionTraceCount'] as const)(
+    'requires a nonnegative safe count for %s',
+    (field) => {
+      for (const value of [-1, 1.5, true, null, Number.MAX_SAFE_INTEGER + 1]) {
+        expect(() =>
+          validateMissionResult({ ...validResult(), [field]: value }),
+        ).toThrow(RangeError)
+      }
     },
   )
 
@@ -249,8 +260,8 @@ describe('MissionResult serialization and runtime validation', () => {
       lowOutputEpisodeCount: 0,
       overloadEpisodeCount: 0,
       endingStability: 100,
-      puzzleMoveCount: 0,
-      hintUsed: false,
+      valveAdjustmentCount: 0,
+      junctionTraceCount: 0,
     })
     const seen = new Set<unknown>()
     const inspect = (value: unknown): void => {

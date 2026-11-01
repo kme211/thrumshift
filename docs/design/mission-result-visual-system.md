@@ -6,7 +6,7 @@ Mission results extend the approved equipment system as terminal run reports. Su
 
 - The result uses an `equipment-shell` with the established station plate, desktop fasteners, printed module strips, serviceable bays, status lamps, and physical control deck.
 - The mission-disposition CRT carries only the large outcome, concise summary, and completion/duration value. Detailed history remains on a non-CRT archival ledger for sustained readability.
-- The archive groups overview, gameplay range, mission events, routing, signal gaps, and interruptions as compact ruled metric rows rather than independent cards.
+- The archive groups overview, gameplay range, mission events, routing, signal gaps, and interruptions as compact ruled metric rows rather than independent cards. Routing now reports Valve adjustments and Junction Traces from the run; trace use does not change performance classification.
 - Performance classification occupies a separate physical bay. The criteria remain available without competing with the primary outcome.
 - The bottom control deck marks the run as closed and retains the existing `Run Again` action.
 

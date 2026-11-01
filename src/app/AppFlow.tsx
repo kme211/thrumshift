@@ -35,7 +35,6 @@ import type {
   MissionFlowFactPayload,
   MissionFlowState,
 } from './MissionFlowController'
-import { getMissionHintEligibility } from './MissionRun'
 import { commitMissionFlowUpdate } from './missionFlowTransition'
 
 const DevelopmentDiagnostics = import.meta.env.DEV
@@ -295,7 +294,6 @@ export function AppFlow({
           ? state.lifecycle.resumeTarget.mission
           : null
     if (run === null) throw new Error('Active mission screen requires a run')
-    const hintEligibility = getMissionHintEligibility(run)
     const simulatorOutputProps =
       selectedSource === 'simulated' &&
       simulatedSource !== null &&
@@ -316,19 +314,19 @@ export function AppFlow({
         }
         pageVisible={state.pageVisibility === 'visible'}
         canResume={canResumeMission(state)}
-        hintEligible={hintEligibility.eligible}
-        hintRemainingMs={hintEligibility.remainingMs}
-        onRotate={(tileId) =>
+        onValveChange={(valve, position) =>
           dispatchFact({
-            type: 'puzzleTileRotated',
+            type: 'puzzleValveChanged',
             occurredAt: clock.now(),
             runGeneration: state.runGeneration,
-            tileId,
+            valve,
+            position,
           })
         }
-        onHint={() =>
+        onTrace={(target) =>
           dispatchFact({
-            type: 'puzzleHintRequested',
+            type: 'puzzleTraceRequested',
+            target,
             occurredAt: clock.now(),
             runGeneration: state.runGeneration,
           })

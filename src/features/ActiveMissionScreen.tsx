@@ -2,7 +2,10 @@ import { useEffect, useRef } from 'react'
 
 import type { MissionRun } from '../app/MissionRun'
 import { BioLinkStatus } from '../components/mission/BioLinkStatus'
-import { ControlledCoolantPuzzle } from '../components/mission/CoolantPuzzle'
+import { CoolantDeductionControls } from '../components/mission/CoolantDeductionControls'
+import { selectPlayerSafeView } from '../domain/puzzle/model'
+import { reactorCooling } from '../domain/puzzle/reactorCooling'
+import type { ValveId } from '../domain/puzzle/types'
 import { OperationalRangeGauge } from '../components/mission/OperationalRangeGauge'
 import { SimulatorOutputControl } from '../components/mission/SimulatorOutputControl'
 import { StationStabilityMeter } from '../components/mission/StationStabilityMeter'
@@ -17,10 +20,8 @@ interface ActiveMissionScreenProps {
   readonly suspensionReasons: readonly SuspensionReason[]
   readonly pageVisible: boolean
   readonly canResume: boolean
-  readonly hintEligible: boolean
-  readonly hintRemainingMs: number
-  readonly onRotate: (tileId: string) => void
-  readonly onHint: () => void
+  readonly onValveChange: (valve: ValveId, position: string) => void
+  readonly onTrace: (target: string) => void
   readonly onReset: () => void
   readonly onPause: () => void
   readonly onResume: () => void
@@ -168,7 +169,7 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
             </div>
             <p className="active-mission__instructions">
               Stay in range while restoring coolant flow. Correct low or high
-              output, then rotate the route into place.
+              output, then adjust the coolant valves.
             </p>
             {props.simulatorOutputBpm === undefined ||
             props.onSimulatorOutputChange === undefined ? null : (
@@ -188,16 +189,11 @@ export function ActiveMissionScreen(props: ActiveMissionScreenProps) {
               <span>KS-CR-03 / LOCAL</span>
             </div>
             <div className="crt-display crt-display--schematic">
-              <ControlledCoolantPuzzle
-                puzzle={props.run.puzzle}
-                hint={props.run.hint}
-                rotationCounts={props.run.puzzleRotationCounts}
+              <CoolantDeductionControls
+                view={selectPlayerSafeView(reactorCooling, props.run.puzzle)}
                 disabled={props.paused || mission.status.phase === 'finalized'}
-                complete={props.run.session.statistics.puzzleCompleted}
-                hintEligible={props.hintEligible}
-                hintRemainingMs={props.hintRemainingMs}
-                onRotate={props.onRotate}
-                onHint={props.onHint}
+                onValveChange={props.onValveChange}
+                onTrace={props.onTrace}
                 onReset={props.onReset}
               />
             </div>

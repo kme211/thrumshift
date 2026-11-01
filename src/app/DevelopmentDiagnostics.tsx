@@ -70,7 +70,10 @@ export function DevelopmentDiagnostics({
           data-mission-duration-above-range-ms={
             activeRun?.session.statistics.completedDurationsMs.aboveRange
           }
-          data-mission-hint-eligibility-ms={activeRun?.hintEligibilityMs}
+          data-mission-valve-adjustments={activeRun?.puzzle.adjustments}
+          data-mission-traces-spent={activeRun?.puzzle.tracesSpent}
+          data-mission-observation-count={activeRun?.puzzle.observations.length}
+          data-mission-discovery-count={activeRun?.puzzle.discoveries.length}
           data-mission-stability={activeRun?.session.mission.stability}
         >
           <dt>Active play</dt>
@@ -97,17 +100,15 @@ export function DevelopmentDiagnostics({
             )}{' '}
             seconds
           </dd>
-          <dt>Puzzle moves</dt>
+          <dt>Valve adjustments</dt>
           <dd>
-            {activeRun?.session.statistics.puzzleMoveCount ??
-              finalizedResult?.puzzleMoveCount}
+            {activeRun?.session.statistics.valveAdjustmentCount ??
+              finalizedResult?.valveAdjustmentCount}
           </dd>
-          <dt>Hint used</dt>
+          <dt>Junction Traces</dt>
           <dd>
-            {(activeRun?.session.statistics.hintUsed ??
-            finalizedResult?.hintUsed)
-              ? 'yes'
-              : 'no'}
+            {activeRun?.session.statistics.junctionTraceCount ??
+              finalizedResult?.junctionTraceCount}
           </dd>
           <dt>Station stability</dt>
           <dd>

@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createMissionRun } from '../app/MissionRun'
 import { ControlledCoolantPuzzle } from '../components/mission/CoolantPuzzle'
+import { createPuzzleState } from '../domain/puzzle/legacy/model'
+import { reactorCoolingEasy } from '../domain/puzzle/legacy/boards/reactorCoolingEasy'
 import { defaultGameplayTuning } from '../config/gameplayTuning'
 import { createClassifierState } from '../domain/heart-rate/classifier'
 import type { TelemetrySourceStatus } from '../telemetry/HeartRateTelemetrySource'
@@ -30,7 +32,7 @@ function missionRun() {
       ...run.session,
       mission: {
         ...run.session.mission,
-        activeElapsedTimeMs: defaultGameplayTuning.puzzle.hintEligibilityMs,
+        activeElapsedTimeMs: 10_000,
         stability: 72,
         signalQuality: 'usable' as const,
         stableClassification: 'above' as const,
@@ -48,8 +50,8 @@ function renderMission(
   initialTelemetryStatus?: TelemetrySourceStatus,
 ) {
   const handlers = {
-    onRotate: vi.fn(),
-    onHint: vi.fn(),
+    onValveChange: vi.fn(),
+    onTrace: vi.fn(),
     onReset: vi.fn(),
     onPause: vi.fn(),
     onResume: vi.fn(),
@@ -70,8 +72,6 @@ function renderMission(
       suspensionReasons={nextReasons}
       pageVisible
       canResume={nextCanResume}
-      hintEligible
-      hintRemainingMs={0}
       {...handlers}
     />
   )
@@ -118,14 +118,14 @@ describe('ActiveMissionScreen', () => {
     )
   })
 
-  it('keeps puzzle, hint, and persistent pause controls touch-sized and intent-only', async () => {
+  it('keeps valve, trace, and persistent pause controls touch-sized and intent-only', async () => {
     const user = userEvent.setup()
-    const { onRotate, onHint, onPause } = renderMission()
-    await user.click(screen.getAllByRole('button', { name: /Row/ })[1]!)
-    await user.click(screen.getByRole('button', { name: 'Request hint' }))
+    const { onValveChange, onTrace, onPause } = renderMission()
+    await user.selectOptions(screen.getByLabelText('V1 position'), 'B')
+    await user.click(screen.getByRole('button', { name: /^Junction Trace$/ }))
     await user.click(screen.getByRole('button', { name: 'Pause mission' }))
-    expect(onRotate).toHaveBeenCalledTimes(1)
-    expect(onHint).toHaveBeenCalledTimes(1)
+    expect(onValveChange).toHaveBeenCalledWith('V1', 'B')
+    expect(onTrace).toHaveBeenCalledWith('A')
     expect(onPause).toHaveBeenCalledTimes(1)
   })
 
@@ -137,7 +137,7 @@ describe('ActiveMissionScreen', () => {
       screen.getByRole('dialog', { name: 'Mission paused' }),
     ).toBeInTheDocument()
     expect(resume).toHaveFocus()
-    expect(screen.getAllByRole('button', { name: /Row/ })[0]).toBeDisabled()
+    expect(screen.getByLabelText('V1 position')).toBeDisabled()
     const cancel = new Event('cancel', { cancelable: true })
     fireEvent(screen.getByRole('dialog', { name: 'Mission paused' }), cancel)
     expect(cancel.defaultPrevented).toBe(true)
@@ -285,7 +285,7 @@ describe('ActiveMissionScreen', () => {
   })
 
   it('keeps countdown changes silent and announces only hint and completion transitions', async () => {
-    const run = missionRun()
+    const run = { puzzle: createPuzzleState(reactorCoolingEasy) }
     const handlers = {
       onRotate: vi.fn(),
       onHint: vi.fn(),

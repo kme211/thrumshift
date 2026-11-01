@@ -72,20 +72,20 @@ const suspension = (
   disconnected,
 })
 
-const rotate = (
+const adjust = (
   occurrenceTimeMs: number,
   sequence: number,
 ): MissionSessionFact => ({
-  type: 'puzzleTileRotated',
+  type: 'puzzleValveChanged',
   occurrenceTimeMs,
   sequence,
 })
 
-const hint = (
+const trace = (
   occurrenceTimeMs: number,
   sequence: number,
 ): MissionSessionFact => ({
-  type: 'puzzleHintRequested',
+  type: 'puzzleTraceRequested',
   occurrenceTimeMs,
   sequence,
 })
@@ -275,7 +275,7 @@ describe('mission result finalization and heart-rate statistics', () => {
       advanceMissionSession(state, sample(999, 11, 120), tuning),
     ).toThrow(RangeError)
     expect(() =>
-      advanceMissionSession(state, rotate(1_000, 10), tuning),
+      advanceMissionSession(state, adjust(1_000, 10), tuning),
     ).toThrow(RangeError)
   })
 })
@@ -501,48 +501,79 @@ describe('pause and disconnect lifecycle-projection metrics', () => {
 })
 
 describe('puzzle facts and authoritative outcomes', () => {
-  it('counts rotations, records useful hint display, and finalizes success', () => {
+  it('counts accepted valve changes and traces, and finalizes success', () => {
     const state = run([
-      rotate(100, 1),
-      rotate(200, 2),
-      rotate(300, 3),
-      hint(400, 4),
+      adjust(100, 1),
+      adjust(200, 2),
+      adjust(300, 3),
+      trace(400, 4),
       complete(1_000, 5),
-      rotate(1_000, 6),
+      adjust(1_000, 6),
       complete(1_000, 7),
     ])
     const result = requireMissionResult(state)
     expect(result).toMatchObject({
       outcome: 'success',
-      puzzleMoveCount: 3,
-      hintUsed: true,
+      valveAdjustmentCount: 3,
+      junctionTraceCount: 1,
       puzzleCompleted: true,
     })
     expect(Object.isFrozen(result)).toBe(true)
     expect(Object.isFrozen(result.targetRange)).toBe(true)
   })
 
-  it('keeps moves and hint use cumulative across puzzle reset', () => {
+  it('keeps adjustments and traces cumulative across puzzle reset', () => {
     const result = requireMissionResult(
       run([
-        rotate(100, 1),
-        hint(200, 2),
+        adjust(100, 1),
+        trace(200, 2),
         reset(300, 3),
-        rotate(400, 4),
+        adjust(400, 4),
         complete(1_000, 5),
       ]),
     )
     expect(result).toMatchObject({
-      puzzleMoveCount: 2,
-      hintUsed: true,
+      valveAdjustmentCount: 2,
+      junctionTraceCount: 1,
       puzzleCompleted: true,
     })
   })
 
+  it('does not count gameplay facts while suspended', () => {
+    const state = run([
+      classifier(0, 1, 'operational'),
+      suspension(100, 2, true),
+      adjust(200, 3),
+      trace(300, 4),
+      reset(400, 5),
+    ])
+    expect(state.statistics).toMatchObject({
+      valveAdjustmentCount: 0,
+      junctionTraceCount: 0,
+    })
+  })
+
+  it.each(['puzzleValveChanged', 'puzzleTraceRequested'] as const)(
+    'consumes no %s expenditure at the exact failure endpoint',
+    (type) => {
+      const result = requireMissionResult(
+        run([
+          classifier(0, 1, 'above'),
+          { type, occurrenceTimeMs: 100_000 / 3, sequence: 2 },
+        ]),
+      )
+      expect(result).toMatchObject({
+        outcome: 'failure',
+        valveAdjustmentCount: 0,
+        junctionTraceCount: 0,
+      })
+    },
+  )
+
   it('copies failure, final stability, time, and active duration from Gate 7A', () => {
     const state = run([
       classifier(0, 1, 'above'),
-      rotate(10_000, 2),
+      adjust(10_000, 2),
       time(40_000, 3),
       complete(40_000, 4),
     ])
@@ -552,7 +583,7 @@ describe('puzzle facts and authoritative outcomes', () => {
       endingStability: 0,
       activeDurationMs: 100_000 / 3,
       finalizedAtTimeMs: 100_000 / 3,
-      puzzleMoveCount: 1,
+      valveAdjustmentCount: 1,
       puzzleCompleted: false,
     })
     expect(result.outcome).toBe(
@@ -619,13 +650,13 @@ describe('scheduler partition independence and deterministic replay', () => {
     const facts = [
       sample(0, 1, 100),
       classifier(0, 2, 'below'),
-      rotate(500, 3),
+      adjust(500, 3),
       suspension(1_000, 4, true, true),
       suspension(2_000, 5, true),
       suspension(3_000, 6, false),
       classifier(3_000, 7, 'operational'),
       sample(3_000, 8, 120),
-      hint(3_500, 9),
+      trace(3_500, 9),
       complete(8_000, 10),
     ] as const
     const first = serializeMissionResult(requireMissionResult(run(facts)))

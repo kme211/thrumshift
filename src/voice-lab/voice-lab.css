@@ -1,0 +1,146 @@
+.voice-lab {
+  max-width: 62rem;
+  margin: auto;
+  padding: max(1rem, env(safe-area-inset-top))
+    max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
+  overflow-wrap: anywhere;
+}
+.voice-lab header,
+.voice-lab section {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--equipment-edge);
+  background: var(--equipment-casing);
+}
+.voice-lab h1 {
+  font-size: 2rem;
+}
+.voice-lab h2 {
+  font: bold 1.25rem var(--font-equipment);
+  color: var(--equipment-label);
+  margin-bottom: 1rem;
+}
+.voice-lab p,
+.voice-lab ul {
+  margin: 0.75rem 0;
+}
+.voice-lab a {
+  text-decoration: underline;
+}
+.voice-lab button,
+.voice-lab select,
+.voice-lab textarea {
+  display: block;
+  width: 100%;
+  min-height: 3.5rem;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  border: 2px solid var(--equipment-edge);
+  border-radius: 0.25rem;
+  color: var(--color-text);
+  background: var(--display-glass-high);
+  font: inherit;
+}
+.voice-lab button {
+  font-weight: bold;
+  cursor: pointer;
+}
+.voice-lab button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.voice-lab .lab-primary {
+  min-height: 5rem;
+  font-size: 1.3rem;
+  color: var(--display-amber);
+}
+.voice-lab .lab-readout {
+  padding: 1rem;
+  background: var(--display-glass);
+  border: 2px solid var(--equipment-edge);
+  font-family: var(--font-instrument);
+}
+.voice-lab .lab-readout strong,
+.voice-lab blockquote {
+  font-size: 1.25rem;
+  color: var(--display-amber);
+}
+.voice-lab .lab-state {
+  display: block;
+  font-size: 1.75rem;
+}
+.voice-lab .lab-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 1.25rem;
+}
+.voice-lab summary {
+  padding: 1rem 0.25rem;
+  cursor: pointer;
+  min-height: 3.5rem;
+}
+.voice-lab pre {
+  white-space: pre-wrap;
+  font-size: 0.85rem;
+  max-height: 25rem;
+  overflow: auto;
+}
+.voice-lab .lab-check {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-height: 3.5rem;
+}
+.voice-lab input[type='checkbox'] {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+.voice-lab .lab-table {
+  overflow-x: auto;
+}
+.voice-lab table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.voice-lab th,
+.voice-lab td {
+  padding: 0.75rem;
+  border: 1px solid var(--equipment-edge);
+  text-align: left;
+}
+.voice-lab textarea {
+  min-height: 7rem;
+}
+.voice-lab nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.voice-lab nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 3rem;
+}
+.voice-lab .lab-monitor {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  background: var(--display-glass);
+  border: 1px solid var(--equipment-edge);
+}
+.voice-lab .lab-monitor .lab-status {
+  gap: 0.25rem 1rem;
+  font-size: 1rem;
+}
+.voice-lab .lab-monitor span {
+  width: 100%;
+  font-size: 0.85rem;
+}
+.voice-lab section {
+  scroll-margin-top: 6rem;
+}

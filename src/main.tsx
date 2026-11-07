@@ -1,9 +1,13 @@
-import { StrictMode } from 'react'
+import { lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 
-import { App } from './app/App'
 import './styles/tokens.css'
 import './styles/global.css'
+
+const Entry =
+  window.location.pathname.replace(/\/$/, '') === '/voice-lab'
+    ? lazy(() => import('./voice-lab/VoiceLab'))
+    : lazy(() => import('./app/App').then(({ App }) => ({ default: App })))
 
 const rootElement = document.getElementById('root')
 
@@ -13,6 +17,8 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App />
+    <Suspense fallback={<p>Loading console…</p>}>
+      <Entry />
+    </Suspense>
   </StrictMode>,
 )

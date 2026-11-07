@@ -110,3 +110,7 @@ Tailwind remains limited to safe-area-aware application layout and a small amoun
 The approved visual rules and captures are indexed under [docs/design](docs/design/README.md). The industrial equipment language now covers the production launch console and the complete mission lifecycle without changing their underlying information architecture.
 
 Run `npm run format` to apply the repository's Prettier rules. `npm run format:check` is the non-mutating quality gate.
+
+## Disposable Voice Lab spike
+
+Open `/voice-lab` directly in development or a branch Preview to compare bounded browser speech recognition, deterministic command parsing, synthesized responses and HR coexistence. It is isolated from mission flow and has no persistence or backend. The five-decision exercise is disposable and non-canonical. See [Voice Lab procedures and limitations](docs/voice-lab/README.md); Android/Pixel Buds/treadmill validation remains pending hardware tests.
